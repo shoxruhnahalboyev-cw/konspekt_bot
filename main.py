@@ -31,6 +31,7 @@ from telegram import (
     BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InputMediaPhoto,
     KeyboardButton,
     ReplyKeyboardMarkup,
     Update,
@@ -67,24 +68,54 @@ keep_alive()
 TOKEN = '8851697720:AAFkUX76UGMIXRxTftQBpqjKyPh76woEvpo'
 
 FONTS = {
-    'font1': {'name': '✍️ 1. Caveat', 'file': 'font1.ttf', 'size': 36},
-    'font2': {'name': '🖋️ 2. Marck Script', 'file': 'font2.ttf', 'size': 34},
-    'font3': {'name': '👨‍🎓 3. Bad Script', 'file': 'font3.ttf', 'size': 35},
-    'font4': {'name': '⚡ 4. Permanent Marker', 'file': 'font4.ttf', 'size': 32},
+    'font1': {
+        'name': '✍️ 1. Caveat (14pt, 1.0)',
+        'file': 'font1.ttf',
+        'size': 32,
+        'line_spacing': 10,
+        'wrap_width': 58,
+    },
+    'font2': {
+        'name': '🖋️ 2. Marck Script (14pt, 1.5)',
+        'file': 'font2.ttf',
+        'size': 32,
+        'line_spacing': 22,
+        'wrap_width': 58,
+    },
+    'font3': {
+        'name': '👨‍🎓 3. Bad Script (12pt, 1.0)',
+        'file': 'font3.ttf',
+        'size': 27,
+        'line_spacing': 8,
+        'wrap_width': 68,
+    },
+    'font4': {
+        'name': '⚡ 4. Permanent Marker',
+        'file': 'font4.ttf',
+        'size': 30,
+        'line_spacing': 12,
+        'wrap_width': 55,
+    },
     'font5': {
         'name': '🖊️ 5. Kalam (Oddiy Ruchka)',
         'file': 'font5.ttf',
-        'size': 34,
+        'size': 32,
+        'line_spacing': 10,
+        'wrap_width': 58,
     },
     'font6': {
         'name': '✏️ 6. Kalam (Ingichka Ruchka)',
         'file': 'font6.ttf',
-        'size': 34,
+        'size': 27,
+        'line_spacing': 8,
+        'wrap_width': 68,
     },
     'font7': {
         'name': '✒️ 7. Kalam (Qalin Ruchka)',
         'file': 'font7.ttf',
-        'size': 34,
+        'size': 32,
+        'line_spacing': 22,
+        'wrap_width': 58,
     },
 }
 
@@ -102,7 +133,7 @@ def main_menu_keyboard():
 def mode_inline_keyboard():
   keyboard = [[
       InlineKeyboardButton(
-          '📄 Oddiy Matn (Printer/Konspekt)', callback_data='mode_text'
+          '📄 Oddiy Matn (A4 Printer)', callback_data='mode_text'
       ),
       InlineKeyboardButton('📜 She\'r / Qo\'shiq uslubi', callback_data='mode_poem'),
   ]]
@@ -148,9 +179,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if not update.message:
     return
   welcome_text = (
-      "Salom! Men matnlaringizni qo'lyozma konspektga aylantirib beruvchi"
-      ' botman. 📝\n\nMenga konspekt qilmoqchi bo\'lgan matningizni shunchaki'
-      ' yuboring!'
+      "Salom! Men matnlaringizni A4 varaqli qo'lyozma konspektga aylantirib"
+      " beruvchi botman. 📝\n\nKatta matn bo'lsa ham bot avtomatik sahifalarga"
+      " bo'lib beradi. Matningizni yuboring!"
   )
   await update.message.reply_text(
       welcome_text, reply_markup=main_menu_keyboard()
@@ -161,7 +192,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if not update.message or not update.message.text:
     if update.message:
       await update.message.reply_text(
-          "Iltimos, faqat matnli xabar yuboring! 📝",
+          'Iltimos, faqat matnli xabar yuboring! 📝',
           reply_markup=main_menu_keyboard(),
       )
     return
@@ -177,9 +208,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
   elif text == 'ℹ️ Bot haqida':
     about_text = (
-        '🤖 **Konspekt Bot** — talabalar va o\'quvchilar uchun eng yaxshi'
-        ' yordamchi!\n\nUshbu bot matnlarni haqiqiy daftardagidek qo\'lyozma'
-        ' rasmga aylantirib beradi.'
+        '🤖 **Konspekt Bot** — Matnlarni A4 formatdagi qo\'lyozma konspekt'
+        ' rasmlariga aylantirib beradi.'
     )
     await update.message.reply_text(
         about_text, parse_mode='Markdown', reply_markup=main_menu_keyboard()
@@ -187,9 +217,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
   elif text == '❓ Yordam':
     help_text = (
-        '📌 **Qanday foydalaniladi?**\n1. Botga matn yuboring.\n2. Matn'
-        " uslubini tanlang (Oddiy matn yoki She'r).\n3. Shriftni tanlang va"
-        ' tayyor rasmni oling!'
+        '📌 **Qanday foydalaniladi?**\n1. Matn yuboring (1000+ so\'z bo\'lsa'
+        " ham bo'laveradi).\n2. Uslubni tanlang.\n3. Shriftni tanlang va tayyor"
+        ' A4 sahifalarni oling!'
     )
     await update.message.reply_text(
         help_text, parse_mode='Markdown', reply_markup=main_menu_keyboard()
@@ -240,14 +270,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   font_info = FONTS[font_key]
   await query.edit_message_text(
-      text=f"⏳ Rasm tayyorlanmoqda ({font_info['name']})..."
+      text=f"⏳ A4 sahifalar tayyorlanmoqda ({font_info['name']})..."
   )
 
   try:
-    image = Image.open('paper.jpg')
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype(font_info['file'], size=font_info['size'])
-
     raw_text = user_data_store[user_id]['text']
     clean_text = re.sub(
         r'[^\w\s\d.,!?\'"\-–—:;()№%@\'"’‘«»QWERTZUIPASDFGHJKLZXCVBNMqwertzuiopasdfghjklyxcvbnmА-Яа-яЎўҚқҒғҲҳ]',
@@ -264,31 +290,64 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
       x_start = 70
       x_indent = 110
-      wrap_width = 58  # O'ng tarafgacha to'liq yetib borishi uchun
+      wrap_width = font_info['wrap_width']
 
-    y = 80
-    line_height = font_info['size'] + 10
-
+    # Barcha qatorlarni shakllantirib olamiz
     paragraphs = clean_text.split('\n')
+    all_lines = []
 
     for paragraph in paragraphs:
       paragraph = paragraph.strip()
       if not paragraph:
-        continue  # Bo'sh qatorlar va ortqcha masofalar o'chirib tashlanadi
+        continue
+      wrapped = textwrap.wrap(paragraph, width=wrap_width)
+      for i, line in enumerate(wrapped):
+        is_indent = i == 0 and mode == 'text'
+        all_lines.append((line, is_indent))
 
-      wrapped_lines = textwrap.wrap(paragraph, width=wrap_width)
+    # A4 Varaq parametrlari
+    y_start = 80
+    max_y = 1150  # paper.jpg dagi A4 chegara balandligi
+    line_height = font_info['size'] + font_info['line_spacing']
 
-      for i, line in enumerate(wrapped_lines):
-        current_x = (
-            x_indent if (i == 0 and mode == 'text') else x_start
-        )
-        draw.text((current_x, y), line, fill=(20, 30, 130), font=font)
-        y += line_height
+    pages = []
+    current_image = Image.open('paper.jpg')
+    current_draw = ImageDraw.Draw(current_image)
+    font = ImageFont.truetype(font_info['file'], size=font_info['size'])
+    y = y_start
 
-    bio = io.BytesIO()
-    bio.name = 'konspekt.jpg'
-    image.save(bio, 'JPEG')
-    bio.seek(0)
+    for line, is_indent in all_lines:
+      # Varaq to'lib qolsa, yangi sahifa (A4 varaq) ochamiz
+      if y + line_height > max_y:
+        pages.append(current_image)
+        current_image = Image.open('paper.jpg')
+        current_draw = ImageDraw.Draw(current_image)
+        y = y_start
+
+      current_x = x_indent if is_indent else x_start
+      current_draw.text((current_x, y), line, fill=(20, 30, 130), font=font)
+      y += line_height
+
+    pages.append(current_image)  # Oxirgi sahifani qo'shish
+
+    # Sahifalarni rasmlar to'plami (MediaGroup) qilib yuborish
+    media_group = []
+    bio_list = []
+
+    for idx, page_img in enumerate(pages):
+      bio = io.BytesIO()
+      bio.name = f'page_{idx+1}.jpg'
+      page_img.save(bio, 'JPEG')
+      bio.seek(0)
+      bio_list.append(bio)
+
+      caption = (
+          f"📄 **A4 Konspekt — {idx+1}/{len(pages)}-sahifa**\nShrift:"
+          f" {font_info['name']}"
+          if idx == 0
+          else ''
+      )
+      media_group.append(InputMediaPhoto(media=bio, caption=caption))
 
     re_select_keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton(
@@ -296,12 +355,12 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     ]])
 
-    await query.message.reply_photo(
-        photo=bio,
-        caption=f"✅ **Konspekt tayyor!**\nUsul: {font_info['name']}",
-        parse_mode='Markdown',
+    await query.message.reply_media_group(media=media_group)
+    await query.message.reply_text(
+        f"✅ Jami {len(pages)} ta A4 sahifa tayyorlandi!",
         reply_markup=re_select_keyboard,
     )
+
   except Exception as e:
     await query.message.reply_text(f'❌ Xatolik: {e}')
 
