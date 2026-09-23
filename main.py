@@ -21,6 +21,7 @@ def keep_alive():
 
 import io
 import os
+import re
 from threading import Thread
 import textwrap
 
@@ -91,7 +92,6 @@ FONTS = {
 user_texts = {}
 
 
-# Asosiy doimiy menyu (Reply Keyboard)
 def main_menu_keyboard():
   keyboard = [
       [KeyboardButton('✍️ Yangi konspekt yozish')],
@@ -100,7 +100,6 @@ def main_menu_keyboard():
   return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-# Shriftlarni tanlash tugmalari (Inline Keyboard)
 def fonts_inline_keyboard():
   keyboard = [
       [
@@ -150,7 +149,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-  # Agar xabar matnli bo'lmasa (masalan stiker, rasm yoki ovozli xabar bo'lsa)
   if not update.message or not update.message.text:
     if update.message:
       await update.message.reply_text(
@@ -162,7 +160,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
   text = update.message.text
   user_id = update.message.from_user.id
 
-  # Doimiy menyu tugmalari bosilganda
   if text == '✍️ Yangi konspekt yozish':
     await update.message.reply_text(
         'Konspekt qilmoqchi bo\'lgan matningizni yuboring:',
@@ -191,7 +188,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return
 
-  # Agar foydalanuvchi oddiy matn yuborsa
   user_texts[user_id] = text
   await update.message.reply_text(
       'Matn qabul qilindi! Endi o\'zingizga yoqqan shriftni (yozuv usulini)'
@@ -206,7 +202,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
 
   await query.answer()
-
   user_id = query.from_user.id
   data = query.data
 
@@ -241,21 +236,44 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw = ImageDraw.Draw(image)
     font = ImageFont.truetype(font_info['file'], size=font_info['size'])
 
-    lines = textwrap.wrap(user_texts[user_id], width=42)
+    # Shrift qo'llab-quvvatlamaydigan emojilarni olib tashlash
+    clean_text = re.sub(
+        r'[^\w\s\d.,!?\'"\-–—:;()№%@\'"’‘«»QWERTZUIPASDFGHJKLZXCVBNMqwertzuiopasdfghjklyxcvbnmА-Яа-яЎўҚқҒғҲҳ]',
+        '',
+        user_texts[user_id],
+    )
 
-    x, y = 80, 100
-    line_height = font_info['size'] + 12
+    # Paragraflar (Enter) bo'yicha ajratish
+    paragraphs = clean_text.split('\n')
 
-    for line in lines:
-      draw.text((x, y), line, fill=(20, 30, 140), font=font)
-      y += line_height
+    x_start = 100  # Chap tomondan xoshiya
+    x_indent = 150  # Xat boshi (abzats) uchun o'ngroqdan boshlash
+    y = 100  # Tepadan boshlanish masofasi
+    line_height = font_info['size'] + 14
+
+    for paragraph in paragraphs:
+      paragraph = paragraph.strip()
+      if not paragraph:
+        y += line_height // 2
+        continue
+
+      # O'ng tomondan joy qolishi uchun enini 36 harfga chegaralaymiz
+      wrapped_lines = textwrap.wrap(paragraph, width=36)
+
+      for i, line in enumerate(wrapped_lines):
+        # Paragrafning birinchi qatori xat boshi bilan boshlanadi
+        current_x = x_indent if i == 0 else x_start
+
+        draw.text((current_x, y), line, fill=(20, 30, 130), font=font)
+        y += line_height
+
+      y += 8  # Paragraflar orasida biroz bo'shliq
 
     bio = io.BytesIO()
     bio.name = 'konspekt.jpg'
     image.save(bio, 'JPEG')
     bio.seek(0)
 
-    # Rasm ostiga qayta shrift almashtirish tugmasi
     re_select_keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton(
             "🔄 Boshqa shriftda ko'rish", callback_data='change_font'
@@ -269,17 +287,13 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=re_select_keyboard,
     )
   except Exception as e:
-    await query.message.reply_text(
-        f"❌ Xatolik! `{font_info['file']}` fayli papkada borligini"
-        f' tekshiring.\nXato: {e}'
-    )
+    await query.message.reply_text(f'❌ Xatolik: {e}')
 
 
 async def setup_bot_commands(app: Application):
-  # Telegram'dagi rasmiy "Menu" tugmasiga buyruqlarni o'rnatish
   commands = [
       BotCommand('start', 'Botni qayta ishga tushirish'),
-      BotCommand('help', 'Yordam va ko'rsatma'),
+      BotCommand('help', 'Yordam va ko\'rsatma'),
   ]
   await app.bot.set_my_commands(commands)
 
@@ -289,13 +303,11 @@ def main():
 
   app.add_handler(CommandHandler('start', start))
   app.add_handler(CommandHandler('help', start))
-  # filters.ALL orqali har qanday xabarni ushlab, handle_message ichida xavfsiz tekshiramiz
   app.add_handler(MessageHandler(filters.ALL, handle_message))
   app.add_handler(CallbackQueryHandler(button_click))
 
-  print('Bot menyu va 7 ta shrift bilan ishga tushdi...')
+  print('Bot ishga tushdi...')
 
-  # Telegram menyusini sozlash
   app.post_init = setup_bot_commands
   app.run_polling()
 
