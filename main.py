@@ -66,7 +66,6 @@ keep_alive()
 
 TOKEN = '8851697720:AAFkUX76UGMIXRxTftQBpqjKyPh76woEvpo'
 
-# 7 ta shrift ro'yxati
 FONTS = {
     'font1': {'name': '✍️ 1. Caveat', 'file': 'font1.ttf', 'size': 36},
     'font2': {'name': '🖋️ 2. Marck Script', 'file': 'font2.ttf', 'size': 34},
@@ -89,7 +88,8 @@ FONTS = {
     },
 }
 
-user_texts = {}
+# Foydalanuvchilar matni va tanlagan rejimini saqlash
+user_data_store = {}
 
 
 def main_menu_keyboard():
@@ -100,6 +100,18 @@ def main_menu_keyboard():
   return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
+# Mode (Uslub) tanlash tugmalari
+def mode_inline_keyboard():
+  keyboard = [[
+      InlineKeyboardButton(
+          '📄 Oddiy Matn (Printer/Konspekt)', callback_data='mode_text'
+      ),
+      InlineKeyboardButton('📜 She\'r / Qo\'shiq uslubi', callback_data='mode_poem'),
+  ]]
+  return InlineKeyboardMarkup(keyboard)
+
+
+# Shriftlarni tanlash tugmalari
 def fonts_inline_keyboard():
   keyboard = [
       [
@@ -178,21 +190,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
   elif text == '❓ Yordam':
     help_text = (
-        '📌 **Qanday foydalaniladi?**\n1. Botga istalgan matningizni yuboring.\n2.'
-        ' Chiqqan tugmalardan o\'zingizga yoqqan shriftni tanlang.\n3. Bot'
-        ' tayyor konspekt rasmini sizga yuboradi!\n\nSavollar bo\'lsa:'
-        ' @my_student_konspekt_bot'
+        '📌 **Qanday foydalaniladi?**\n1. Botga matn yuboring.\n2. Matn'
+        " uslubini tanlang (Oddiy matn yoki She'r).\n3. Shriftni tanlang va"
+        ' tayyor rasmni oling!'
     )
     await update.message.reply_text(
         help_text, parse_mode='Markdown', reply_markup=main_menu_keyboard()
     )
     return
 
-  user_texts[user_id] = text
+  # Matnni saqlab, uslub tanlashni so'raymiz
+  user_data_store[user_id] = {'text': text, 'mode': 'text'}
   await update.message.reply_text(
-      'Matn qabul qilindi! Endi o\'zingizga yoqqan shriftni (yozuv usulini)'
-      ' tanlang:',
-      reply_markup=fonts_inline_keyboard(),
+      'Matn qabul qilindi! Yozuv uslubini tanlang:',
+      reply_markup=mode_inline_keyboard(),
   )
 
 
@@ -205,28 +216,34 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
   user_id = query.from_user.id
   data = query.data
 
-  if data == 'change_font':
-    if user_id in user_texts:
-      await query.message.reply_text(
-          'Boshqa shriftni tanlang:', reply_markup=fonts_inline_keyboard()
-      )
-    else:
-      await query.message.reply_text(
-          'Iltimos, avval yangi matn yuboring.',
-          reply_markup=main_menu_keyboard(),
-      )
-    return
-
-  if user_id not in user_texts:
+  if user_id not in user_data_store:
     await query.message.reply_text(
         'Matn topilmadi. Qaytadan matn yuboring.',
         reply_markup=main_menu_keyboard(),
     )
     return
 
-  font_key = data
-  font_info = FONTS[font_key]
+  # Uslub tanlanganda
+  if data.startswith('mode_'):
+    mode = 'poem' if data == 'mode_poem' else 'text'
+    user_data_store[user_id]['mode'] = mode
+    await query.edit_message_text(
+        text='Ajoyib! Endi o\'zingizga yoqqan shriftni tanlang:',
+        reply_markup=fonts_inline_keyboard(),
+    )
+    return
 
+  if data == 'change_font':
+    await query.message.reply_text(
+        'Boshqa shriftni tanlang:', reply_markup=fonts_inline_keyboard()
+    )
+    return
+
+  font_key = data
+  if font_key not in FONTS:
+    return
+
+  font_info = FONTS[font_key]
   await query.edit_message_text(
       text=f"⏳ Rasm tayyorlanmoqda ({font_info['name']})..."
   )
@@ -236,20 +253,29 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw = ImageDraw.Draw(image)
     font = ImageFont.truetype(font_info['file'], size=font_info['size'])
 
-    # Shrift qo'llab-quvvatlamaydigan emojilarni olib tashlash
+    # Emojilarni tozalash
+    raw_text = user_data_store[user_id]['text']
     clean_text = re.sub(
         r'[^\w\s\d.,!?\'"\-–—:;()№%@\'"’‘«»QWERTZUIPASDFGHJKLZXCVBNMqwertzuiopasdfghjklyxcvbnmА-Яа-яЎўҚқҒғҲҳ]',
         '',
-        user_texts[user_id],
+        raw_text,
     )
 
-    # Paragraflar (Enter) bo'yicha ajratish
     paragraphs = clean_text.split('\n')
+    mode = user_data_store[user_id].get('mode', 'text')
 
-    x_start = 100  # Chap tomondan xoshiya
-    x_indent = 150  # Xat boshi (abzats) uchun o'ngroqdan boshlash
-    y = 100  # Tepadan boshlanish masofasi
-    line_height = font_info['size'] + 14
+    # Uslubga qarab parametrlar
+    if mode == 'poem':
+      x_start = 160  # She'r uslubida chapdan ko'proq suriladi (markazlashadi)
+      x_indent = 160
+      wrap_width = 32  # Eni torroq
+    else:
+      x_start = 90  # Oddiy matnda varaqning chetigacha boradi
+      x_indent = 130  # Abzats (xat boshi)
+      wrap_width = 50  # Eni kengroq (Printer uchun ideal)
+
+    y = 90
+    line_height = font_info['size'] + 12
 
     for paragraph in paragraphs:
       paragraph = paragraph.strip()
@@ -257,17 +283,16 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         y += line_height // 2
         continue
 
-      # O'ng tomondan joy qolishi uchun enini 36 harfga chegaralaymiz
-      wrapped_lines = textwrap.wrap(paragraph, width=36)
+      wrapped_lines = textwrap.wrap(paragraph, width=wrap_width)
 
       for i, line in enumerate(wrapped_lines):
-        # Paragrafning birinchi qatori xat boshi bilan boshlanadi
-        current_x = x_indent if i == 0 else x_start
-
+        current_x = (
+            x_indent if (i == 0 and mode == 'text') else x_start
+        )  # Faqat oddiy matnda abzats ishlaydi
         draw.text((current_x, y), line, fill=(20, 30, 130), font=font)
         y += line_height
 
-      y += 8  # Paragraflar orasida biroz bo'shliq
+      y += 6
 
     bio = io.BytesIO()
     bio.name = 'konspekt.jpg'
