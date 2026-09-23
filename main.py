@@ -88,7 +88,6 @@ FONTS = {
     },
 }
 
-# Foydalanuvchilar matni va tanlagan rejimini saqlash
 user_data_store = {}
 
 
@@ -100,7 +99,6 @@ def main_menu_keyboard():
   return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-# Mode (Uslub) tanlash tugmalari
 def mode_inline_keyboard():
   keyboard = [[
       InlineKeyboardButton(
@@ -111,7 +109,6 @@ def mode_inline_keyboard():
   return InlineKeyboardMarkup(keyboard)
 
 
-# Shriftlarni tanlash tugmalari
 def fonts_inline_keyboard():
   keyboard = [
       [
@@ -199,7 +196,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return
 
-  # Matnni saqlab, uslub tanlashni so'raymiz
   user_data_store[user_id] = {'text': text, 'mode': 'text'}
   await update.message.reply_text(
       'Matn qabul qilindi! Yozuv uslubini tanlang:',
@@ -223,7 +219,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return
 
-  # Uslub tanlanganda
   if data.startswith('mode_'):
     mode = 'poem' if data == 'mode_poem' else 'text'
     user_data_store[user_id]['mode'] = mode
@@ -253,7 +248,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw = ImageDraw.Draw(image)
     font = ImageFont.truetype(font_info['file'], size=font_info['size'])
 
-    # Emojilarni tozalash
     raw_text = user_data_store[user_id]['text']
     clean_text = re.sub(
         r'[^\w\s\d.,!?\'"\-–—:;()№%@\'"’‘«»QWERTZUIPASDFGHJKLZXCVBNMqwertzuiopasdfghjklyxcvbnmА-Яа-яЎўҚқҒғҲҳ]',
@@ -261,38 +255,35 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         raw_text,
     )
 
-    paragraphs = clean_text.split('\n')
     mode = user_data_store[user_id].get('mode', 'text')
 
-    # Uslubga qarab parametrlar
     if mode == 'poem':
-      x_start = 160  # She'r uslubida chapdan ko'proq suriladi (markazlashadi)
+      x_start = 160
       x_indent = 160
-      wrap_width = 32  # Eni torroq
+      wrap_width = 32
     else:
-      x_start = 90  # Oddiy matnda varaqning chetigacha boradi
-      x_indent = 130  # Abzats (xat boshi)
-      wrap_width = 50  # Eni kengroq (Printer uchun ideal)
+      x_start = 70
+      x_indent = 110
+      wrap_width = 58  # O'ng tarafgacha to'liq yetib borishi uchun
 
-    y = 90
-    line_height = font_info['size'] + 12
+    y = 80
+    line_height = font_info['size'] + 10
+
+    paragraphs = clean_text.split('\n')
 
     for paragraph in paragraphs:
       paragraph = paragraph.strip()
       if not paragraph:
-        y += line_height // 2
-        continue
+        continue  # Bo'sh qatorlar va ortqcha masofalar o'chirib tashlanadi
 
       wrapped_lines = textwrap.wrap(paragraph, width=wrap_width)
 
       for i, line in enumerate(wrapped_lines):
         current_x = (
             x_indent if (i == 0 and mode == 'text') else x_start
-        )  # Faqat oddiy matnda abzats ishlaydi
+        )
         draw.text((current_x, y), line, fill=(20, 30, 130), font=font)
         y += line_height
-
-      y += 6
 
     bio = io.BytesIO()
     bio.name = 'konspekt.jpg'
