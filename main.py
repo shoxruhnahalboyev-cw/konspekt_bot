@@ -1,3 +1,26 @@
+import os
+from threading import Thread
+from flask import Flask
+
+app = Flask('')
+
+
+@app.route('/')
+def home():
+  return 'Bot is alive!'
+
+
+def run():
+  app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
+
+def keep_alive():
+  t = Thread(target=run)
+  t.start()
+
+
+# Botni ishga tushirish funksiyasidan oldin keep_alive() ni chaqiramiz:
+keep_alive()
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from PIL import Image, ImageDraw, ImageFont
