@@ -22,8 +22,9 @@ def keep_alive():
 import io
 import os
 import re
-from threading import Thread
+import sqlite3
 import textwrap
+from threading import Thread
 
 from flask import Flask
 from PIL import Image, ImageDraw, ImageFont
@@ -66,9 +67,55 @@ def keep_alive():
 keep_alive()
 
 TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
-
-# Kanalingiz username-i o'rnatildi
 CHANNEL_USERNAME = '@shoxrux_code'
+
+# ⚠️ SHU YERGA O'ZINGIZNING TELEGRAM ID-INGIZNI YOZING (@userinfobot'dan bilsangiz bo'ladi)
+ADMIN_ID = 7439126820
+
+
+# --- MA'LUMOTLAR BAZASI (SQLite) ---
+def init_db():
+  """Baza faylini va jadvalini yaratadi"""
+  conn = sqlite3.connect('bot_users.db')
+  cursor = conn.cursor()
+  cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            full_name TEXT,
+            username TEXT,
+            joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+  conn.commit()
+  conn.close()
+
+
+def add_user(user_id: int, full_name: str, username: str):
+  """Yangi foydalanuvchini bazaga saqlaydi"""
+  conn = sqlite3.connect('bot_users.db')
+  cursor = conn.cursor()
+  cursor.execute(
+      '''
+        INSERT OR IGNORE INTO users (user_id, full_name, username) 
+        VALUES (?, ?, ?)
+    ''',
+      (user_id, full_name, username),
+  )
+  conn.commit()
+  conn.close()
+
+
+def get_users_count() -> int:
+  """Jami foydalanuvchilar sonini qaytaradi"""
+  conn = sqlite3.connect('bot_users.db')
+  cursor = conn.cursor()
+  cursor.execute('SELECT COUNT(*) FROM users')
+  count = cursor.fetchone()[0]
+  conn.close()
+  return count
+
+
+init_db()
 
 FONTS = {
     'font1': {
@@ -128,20 +175,16 @@ user_data_store = {}
 async def check_subscription(
     user_id: int, context: ContextTypes.DEFAULT_TYPE
 ) -> bool:
-  """Foydalanuvchi kanalda bor-yo'qligini tekshirish"""
   try:
     member = await context.bot.get_chat_member(
         chat_id=CHANNEL_USERNAME, user_id=user_id
     )
-    if member.status in ['creator', 'administrator', 'member']:
-      return True
-    return False
+    return member.status in ['creator', 'administrator', 'member']
   except Exception:
     return False
 
 
 def sub_keyboard():
-  """Kanalga a'zo bo'lish tugmasi"""
   clean_username = CHANNEL_USERNAME.replace('@', '')
   keyboard = [
       [
@@ -215,9 +258,12 @@ def fonts_inline_keyboard():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if not update.message:
     return
-  user_id = update.message.from_user.id
+  user = update.message.from_user
 
-  if not await check_subscription(user_id, context):
+  # Foydalanuvchini bazaga qo'shamiz
+  add_user(user.id, user.full_name, user.username)
+
+  if not await check_subscription(user.id, context):
     await update.message.reply_text(
         "⚠️ **Botdan foydalanish uchun avval kanalimizga a'zo bo'ling!**\n\nA'zo"
         " bo'lgach, 'Tekshirish' tugmasini bosing.",
@@ -236,14 +282,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
   )
 
 
+# --- ADMIN STATISTIKA BUYRUG'I ---
+async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+  user_id = update.message.from_user.id
+  if user_id == ADMIN_ID:
+    total_users = get_users_count()
+    await update.message.reply_text(
+        f'📊 **Bot Statistikasi:**\n\n' f'👤 Jami foydalanuvchilar: **{total_users} ta**',
+        parse_mode='Markdown',
+    )
+  else:
+    await update.message.reply_text(
+        "❌ Siz bot admini emassiz!", reply_markup=main_menu_keyboard()
+    )
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if not update.message or not update.message.text:
     return
 
-  user_id = update.message.from_user.id
+  user = update.message.from_user
+  add_user(user.id, user.full_name, user.username)
 
-  # Kanal a'zoligini tekshiramiz
-  if not await check_subscription(user_id, context):
+  if not await check_subscription(user.id, context):
     await update.message.reply_text(
         "⚠️ **Botdan foydalanish uchun avval kanalimizga a'zo bo'ling!**",
         parse_mode='Markdown',
@@ -279,7 +340,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return
 
-  user_data_store[user_id] = {'text': text, 'mode': 'text'}
+  user_data_store[user.id] = {'text': text, 'mode': 'text'}
   await update.message.reply_text(
       'Matn qabul qilindi! Yozuv uslubini tanlang:',
       reply_markup=mode_inline_keyboard(),
@@ -295,7 +356,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
   user_id = query.from_user.id
   data = query.data
 
-  # Tekshirish tugmasi bosilganda
   if data == 'check_sub':
     if await check_subscription(user_id, context):
       await query.message.delete()
@@ -442,6 +502,7 @@ async def setup_bot_commands(app: Application):
   commands = [
       BotCommand('start', 'Botni qayta ishga tushirish'),
       BotCommand('help', 'Yordam va ko\'rsatma'),
+      BotCommand('stat', 'Statistika (Admin)'),
   ]
   await app.bot.set_my_commands(commands)
 
@@ -451,6 +512,7 @@ def main():
 
   app.add_handler(CommandHandler('start', start))
   app.add_handler(CommandHandler('help', start))
+  app.add_handler(CommandHandler('stat', stat_command))
   app.add_handler(MessageHandler(filters.ALL, handle_message))
   app.add_handler(CallbackQueryHandler(button_click))
 
