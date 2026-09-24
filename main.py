@@ -75,7 +75,6 @@ ADMIN_ID = 123456789
 
 # --- MA'LUMOTLAR BAZASI (SQLite) ---
 def init_db():
-  """Baza faylini va jadvalini yaratadi"""
   conn = sqlite3.connect('bot_users.db')
   cursor = conn.cursor()
   cursor.execute('''
@@ -91,7 +90,6 @@ def init_db():
 
 
 def add_user(user_id: int, full_name: str, username: str):
-  """Yangi foydalanuvchini bazaga saqlaydi"""
   conn = sqlite3.connect('bot_users.db')
   cursor = conn.cursor()
   cursor.execute(
@@ -106,7 +104,6 @@ def add_user(user_id: int, full_name: str, username: str):
 
 
 def get_users_count() -> int:
-  """Jami foydalanuvchilar sonini qaytaradi"""
   conn = sqlite3.connect('bot_users.db')
   cursor = conn.cursor()
   cursor.execute('SELECT COUNT(*) FROM users')
@@ -117,56 +114,55 @@ def get_users_count() -> int:
 
 init_db()
 
-# A4 Varaq o'lchamlari va marginlari (Chap: 2cm, O'ng: 1.5cm, Tepadan: 1.5cm, Pastdan: 1.5cm)
 FONTS = {
     'font1': {
         'name': '✍️ 1. Caveat (14pt)',
         'file': 'font1.ttf',
         'size': 34,
         'line_spacing': 12,
-        'wrap_width': 62,
+        'wrap_width': 60,
     },
     'font2': {
         'name': '🖋️ 2. Marck Script (14pt)',
         'file': 'font2.ttf',
         'size': 34,
         'line_spacing': 14,
-        'wrap_width': 60,
+        'wrap_width': 58,
     },
     'font3': {
         'name': '👨‍🎓 3. Bad Script (12pt)',
         'file': 'font3.ttf',
         'size': 29,
         'line_spacing': 10,
-        'wrap_width': 68,
+        'wrap_width': 66,
     },
     'font4': {
         'name': '⚡ 4. Permanent Marker',
         'file': 'font4.ttf',
         'size': 32,
         'line_spacing': 14,
-        'wrap_width': 58,
+        'wrap_width': 56,
     },
     'font5': {
         'name': '🖊️ 5. Kalam (Oddiy Ruchka)',
         'file': 'font5.ttf',
         'size': 34,
         'line_spacing': 12,
-        'wrap_width': 62,
+        'wrap_width': 60,
     },
     'font6': {
         'name': '✏️ 6. Kalam (Ingichka Ruchka)',
         'file': 'font6.ttf',
         'size': 29,
         'line_spacing': 10,
-        'wrap_width': 68,
+        'wrap_width': 66,
     },
     'font7': {
         'name': '✒️ 7. Kalam (Qalin Ruchka)',
         'file': 'font7.ttf',
         'size': 34,
         'line_spacing': 14,
-        'wrap_width': 60,
+        'wrap_width': 58,
     },
 }
 
@@ -419,63 +415,73 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mode = user_data_store[user_id].get('mode', 'text')
 
-    # A4 MARGINLAR: Chap 2 sm (80px), O'ng 1.5 sm, Yuqori 1.5 sm (80px), Past 1.5 sm (1300px)
     if mode == 'poem':
       x_start = 140
       x_indent = 140
       wrap_width = 40
     else:
-      x_start = 80  # Chap tomondan 2 sm tabiiy bo'sh joy
-      x_indent = 120  # Xatboshi joyi
+      x_start = 80
+      x_indent = 120
       wrap_width = font_info['wrap_width']
 
-    paragraphs = clean_text.split('\n')
-    all_lines = []
+    y_start = 80
+    max_y = 1310
+    line_height = font_info['size'] + font_info['line_spacing']
+    lines_per_page = (max_y - y_start) // line_height
 
-    for paragraph in paragraphs:
+    # --- AQLI PARAGRAFLAR VA GAPLAR BO'LISH ALGORITMI ---
+    raw_paragraphs = clean_text.split('\n')
+    pages_lines = []
+    current_page_lines = []
+
+    for paragraph in raw_paragraphs:
       paragraph = paragraph.strip()
       if not paragraph:
         continue
-      wrapped = textwrap.wrap(paragraph, width=wrap_width)
-      for i, line in enumerate(wrapped):
-        is_indent = i == 0 and mode == 'text'
-        all_lines.append((line, is_indent))
 
-    y_start = 80  # Tepadan 1.5 sm joy (A4 ning aynan yuqori qismidan boshlanadi)
-    max_y = (
-        1300  # Pastdan 1.5 sm joy qolguncha (butun A4 varag'ini to'liq egallaydi)
-    )
-    line_height = font_info['size'] + font_info['line_spacing']
+      # Paragrafni gaplarga ajratamiz (., !, ? orqali)
+      sentences = re.split(r'(?<=[.!?]) +', paragraph)
 
+      for sentence in sentences:
+        wrapped_sentence = textwrap.wrap(sentence, width=wrap_width)
+        sentence_line_count = len(wrapped_sentence)
+
+        # Agar gap joriy sahifaga to'g'ri kelmasa, uni To'liq YANGI SAHIFAGA o'tkazamiz
+        if len(current_page_lines) + sentence_line_count > lines_per_page:
+          if current_page_lines:
+            pages_lines.append(current_page_lines)
+            current_page_lines = []
+
+        # Gapdagi qatorlarni sahifaga qo'shamiz
+        for idx, line in enumerate(wrapped_sentence):
+          is_indent = idx == 0 and mode == 'text'
+          current_page_lines.append((line, is_indent))
+
+    if current_page_lines:
+      pages_lines.append(current_page_lines)
+
+    # --- RASMLARNI YARATISH ---
     pages = []
-    current_image = Image.open('paper.jpg')
-    current_draw = ImageDraw.Draw(current_image)
     font = ImageFont.truetype(font_info['file'], size=font_info['size'])
-    y = y_start
 
-    for line, is_indent in all_lines:
-      if y + line_height > max_y:
-        pages.append(current_image)
-        current_image = Image.open('paper.jpg')
-        current_draw = ImageDraw.Draw(current_image)
-        y = y_start
+    for page_lines in pages_lines:
+      current_image = Image.open('paper.jpg')
+      current_draw = ImageDraw.Draw(current_image)
+      y = y_start
 
-      current_x = x_indent if is_indent else x_start
-      # To'q ko'k rangda tabiiy ko'rinish berib yozish
-      current_draw.text((current_x, y), line, fill=(20, 35, 125), font=font)
-      y += line_height
+      for line, is_indent in page_lines:
+        current_x = x_indent if is_indent else x_start
+        current_draw.text((current_x, y), line, fill=(20, 35, 125), font=font)
+        y += line_height
 
-    pages.append(current_image)
+      pages.append(current_image)
 
     media_group = []
-    bio_list = []
-
     for idx, page_img in enumerate(pages):
       bio = io.BytesIO()
       bio.name = f'page_{idx+1}.jpg'
       page_img.save(bio, 'JPEG')
       bio.seek(0)
-      bio_list.append(bio)
 
       caption = (
           f"📄 **A4 Konspekt — {idx+1}/{len(pages)}-sahifa**\nShrift:"
