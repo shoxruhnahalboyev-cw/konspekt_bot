@@ -65,7 +65,7 @@ def keep_alive():
 
 keep_alive()
 
-TOKEN = '8851697720:AAFkUX76UGMIXRxTftQBpqjKyPh76woEvpo'
+TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
 
 FONTS = {
     'font1': {
