@@ -69,8 +69,8 @@ keep_alive()
 TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
 CHANNEL_USERNAME = '@shoxrux_code'
 
-# ⚠️ SHU YERGA O'ZINGIZNING TELEGRAM ID-INGIZNI YOZING (@userinfobot'dan bilsangiz bo'ladi)
-ADMIN_ID = 123456789
+# ⚠️ O'ZINGIZNING TELEGRAM ID-INGIZNI YOZING
+ADMIN_ID = 7439126820
 
 
 # --- MA'LUMOTLAR BAZASI (SQLite) ---
@@ -114,55 +114,56 @@ def get_users_count() -> int:
 
 init_db()
 
+# Shriftlar konfiguratsiyasi (Baza o'lchamlari)
 FONTS = {
     'font1': {
-        'name': '✍️ 1. Caveat (14pt)',
+        'name': '✍️ 1. Caveat (Talaba qo\'lyozmasi)',
         'file': 'font1.ttf',
-        'size': 34,
-        'line_spacing': 12,
-        'wrap_width': 60,
+        'base_size': 26,
+        'base_spacing': 8,
+        'wrap_width': 70,
     },
     'font2': {
-        'name': '🖋️ 2. Marck Script (14pt)',
+        'name': '🖋️ 2. Marck Script',
         'file': 'font2.ttf',
-        'size': 34,
-        'line_spacing': 14,
-        'wrap_width': 58,
+        'base_size': 26,
+        'base_spacing': 9,
+        'wrap_width': 68,
     },
     'font3': {
-        'name': '👨‍🎓 3. Bad Script (12pt)',
+        'name': '👨‍🎓 3. Bad Script',
         'file': 'font3.ttf',
-        'size': 29,
-        'line_spacing': 10,
-        'wrap_width': 66,
+        'base_size': 24,
+        'base_spacing': 7,
+        'wrap_width': 72,
     },
     'font4': {
         'name': '⚡ 4. Permanent Marker',
         'file': 'font4.ttf',
-        'size': 32,
-        'line_spacing': 14,
-        'wrap_width': 56,
+        'base_size': 25,
+        'base_spacing': 9,
+        'wrap_width': 65,
     },
     'font5': {
         'name': '🖊️ 5. Kalam (Oddiy Ruchka)',
         'file': 'font5.ttf',
-        'size': 34,
-        'line_spacing': 12,
-        'wrap_width': 60,
+        'base_size': 26,
+        'base_spacing': 8,
+        'wrap_width': 70,
     },
     'font6': {
         'name': '✏️ 6. Kalam (Ingichka Ruchka)',
         'file': 'font6.ttf',
-        'size': 29,
-        'line_spacing': 10,
-        'wrap_width': 66,
+        'base_size': 24,
+        'base_spacing': 7,
+        'wrap_width': 72,
     },
     'font7': {
         'name': '✒️ 7. Kalam (Qalin Ruchka)',
         'file': 'font7.ttf',
-        'size': 34,
-        'line_spacing': 14,
-        'wrap_width': 58,
+        'base_size': 26,
+        'base_spacing': 9,
+        'wrap_width': 68,
     },
 }
 
@@ -270,8 +271,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   welcome_text = (
       "Salom! Men matnlaringizni A4 varaqli qo'lyozma konspektga aylantirib"
-      " beruvchi botman. 📝\n\nKatta matn bo'lsa ham bot avtomatik sahifalarga"
-      " bo'lib beradi. Matningizni yuboring!"
+      " beruvchi botman. 📝\n\nMatningizni yuboring va A4 shaklidagi haqiqiy"
+      ' talaba konspektiga ega bo\'ling!'
   )
   await update.message.reply_text(
       welcome_text, reply_markup=main_menu_keyboard()
@@ -283,7 +284,8 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if user_id == ADMIN_ID:
     total_users = get_users_count()
     await update.message.reply_text(
-        f'📊 **Bot Statistikasi:**\n\n' f'👤 Jami foydalanuvchilar: **{total_users} ta**',
+        f'📊 **Bot Statistikasi:**\n\n👤 Jami foydalanuvchilar: **{total_users}'
+        ' ta**',
         parse_mode='Markdown',
     )
   else:
@@ -326,9 +328,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
   elif text == '❓ Yordam':
     help_text = (
-        "📌 **Qanday foydalaniladi?**\n1. Matn yuboring (1000+ so'z bo'lsa"
-        " ham bo'laveradi).\n2. Uslubni tanlang.\n3. Shriftni tanlang va tayyor"
-        ' A4 sahifalarni oling!'
+        "📌 **Qanday foydalaniladi?**\n1. Matn yuboring.\n2. Uslubni tanlang.\n3."
+        ' Shriftni tanlang va A4 sahifani oling!'
     )
     await update.message.reply_text(
         help_text, parse_mode='Markdown', reply_markup=main_menu_keyboard()
@@ -415,21 +416,37 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mode = user_data_store[user_id].get('mode', 'text')
 
+    # MARGINLAR VA PLANETKA TARTIBI
     if mode == 'poem':
       x_start = 140
       x_indent = 140
-      wrap_width = 40
+      wrap_width = 45
     else:
-      x_start = 80
-      x_indent = 120
+      x_start = 75  # Chap margin ~1.8 sm
+      x_indent = 110  # Paragraf o'ngroq xatboshi
       wrap_width = font_info['wrap_width']
 
-    y_start = 80
-    max_y = 1310
-    line_height = font_info['size'] + font_info['line_spacing']
+    y_start = 75  # Tepadagi margin ~1.5 sm
+    max_y = 1320  # Pastki marja ~1.5 sm bo'sh joygacha
+
+    # --- DINAMIK FONT VA QATOR ORALIG'INI HISOBLASH ---
+    words_count = len(clean_text.split())
+
+    # Harf hajmi va spetsifikatsiyalarini matn uzunligiga moslash
+    font_size = font_info['base_size']
+    line_spacing = font_info['base_spacing']
+
+    if words_count < 220:
+      font_size += 3
+      line_spacing += 3
+    elif words_count > 380:
+      font_size -= 2
+      line_spacing -= 2
+
+    line_height = font_size + line_spacing
     lines_per_page = (max_y - y_start) // line_height
 
-    # --- AQLI PARAGRAFLAR VA GAPLAR BO'LISH ALGORITMI ---
+    # --- GAPLARNI KESMASDAN SAHIFALARGA BO'LISH ---
     raw_paragraphs = clean_text.split('\n')
     pages_lines = []
     current_page_lines = []
@@ -439,20 +456,19 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
       if not paragraph:
         continue
 
-      # Paragrafni gaplarga ajratamiz (., !, ? orqali)
+      # Gaplarni yakunlovchi belgilar orqali bo'lish (., !, ?)
       sentences = re.split(r'(?<=[.!?]) +', paragraph)
 
       for sentence in sentences:
         wrapped_sentence = textwrap.wrap(sentence, width=wrap_width)
         sentence_line_count = len(wrapped_sentence)
 
-        # Agar gap joriy sahifaga to'g'ri kelmasa, uni To'liq YANGI SAHIFAGA o'tkazamiz
+        # Agar gap joriy A4 betga sig'masa, gapni TO'LIQ yangi sahifaga o'tkazish
         if len(current_page_lines) + sentence_line_count > lines_per_page:
           if current_page_lines:
             pages_lines.append(current_page_lines)
             current_page_lines = []
 
-        # Gapdagi qatorlarni sahifaga qo'shamiz
         for idx, line in enumerate(wrapped_sentence):
           is_indent = idx == 0 and mode == 'text'
           current_page_lines.append((line, is_indent))
@@ -462,7 +478,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # --- RASMLARNI YARATISH ---
     pages = []
-    font = ImageFont.truetype(font_info['file'], size=font_info['size'])
+    font = ImageFont.truetype(font_info['file'], size=font_size)
 
     for page_lines in pages_lines:
       current_image = Image.open('paper.jpg')
@@ -471,7 +487,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
       for line, is_indent in page_lines:
         current_x = x_indent if is_indent else x_start
-        current_draw.text((current_x, y), line, fill=(20, 35, 125), font=font)
+        # Tabiiy ko'k siyoh rangi (Dark Slate Blue / Navy)
+        current_draw.text((current_x, y), line, fill=(25, 40, 115), font=font)
         y += line_height
 
       pages.append(current_image)
