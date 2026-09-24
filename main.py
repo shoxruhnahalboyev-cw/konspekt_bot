@@ -117,55 +117,56 @@ def get_users_count() -> int:
 
 init_db()
 
+# A4 Varaq o'lchamlari va marginlari (Chap: 2cm, O'ng: 1.5cm, Tepadan: 1.5cm, Pastdan: 1.5cm)
 FONTS = {
     'font1': {
-        'name': '✍️ 1. Caveat (14pt, 1.0)',
+        'name': '✍️ 1. Caveat (14pt)',
         'file': 'font1.ttf',
-        'size': 32,
-        'line_spacing': 10,
-        'wrap_width': 78,
+        'size': 34,
+        'line_spacing': 12,
+        'wrap_width': 62,
     },
     'font2': {
-        'name': '🖋️ 2. Marck Script (14pt, 1.5)',
+        'name': '🖋️ 2. Marck Script (14pt)',
         'file': 'font2.ttf',
-        'size': 32,
-        'line_spacing': 22,
-        'wrap_width': 78,
+        'size': 34,
+        'line_spacing': 14,
+        'wrap_width': 60,
     },
     'font3': {
-        'name': '👨‍🎓 3. Bad Script (12pt, 1.0)',
+        'name': '👨‍🎓 3. Bad Script (12pt)',
         'file': 'font3.ttf',
-        'size': 27,
-        'line_spacing': 8,
-        'wrap_width': 88,
+        'size': 29,
+        'line_spacing': 10,
+        'wrap_width': 68,
     },
     'font4': {
         'name': '⚡ 4. Permanent Marker',
         'file': 'font4.ttf',
-        'size': 30,
-        'line_spacing': 12,
-        'wrap_width': 72,
+        'size': 32,
+        'line_spacing': 14,
+        'wrap_width': 58,
     },
     'font5': {
         'name': '🖊️ 5. Kalam (Oddiy Ruchka)',
         'file': 'font5.ttf',
-        'size': 32,
-        'line_spacing': 10,
-        'wrap_width': 78,
+        'size': 34,
+        'line_spacing': 12,
+        'wrap_width': 62,
     },
     'font6': {
         'name': '✏️ 6. Kalam (Ingichka Ruchka)',
         'file': 'font6.ttf',
-        'size': 27,
-        'line_spacing': 8,
-        'wrap_width': 88,
+        'size': 29,
+        'line_spacing': 10,
+        'wrap_width': 68,
     },
     'font7': {
         'name': '✒️ 7. Kalam (Qalin Ruchka)',
         'file': 'font7.ttf',
-        'size': 32,
-        'line_spacing': 22,
-        'wrap_width': 78,
+        'size': 34,
+        'line_spacing': 14,
+        'wrap_width': 60,
     },
 }
 
@@ -260,7 +261,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
   user = update.message.from_user
 
-  # Foydalanuvchini bazaga saqlash
   add_user(user.id, user.full_name, user.username)
 
   if not await check_subscription(user.id, context):
@@ -282,7 +282,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
   )
 
 
-# --- ADMIN STATISTIKA BUYRUG'I ---
 async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
   user_id = update.message.from_user.id
   if user_id == ADMIN_ID:
@@ -420,13 +419,14 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mode = user_data_store[user_id].get('mode', 'text')
 
+    # A4 MARGINLAR: Chap 2 sm (80px), O'ng 1.5 sm, Yuqori 1.5 sm (80px), Past 1.5 sm (1300px)
     if mode == 'poem':
-      x_start = 100
-      x_indent = 100
-      wrap_width = 45
+      x_start = 140
+      x_indent = 140
+      wrap_width = 40
     else:
-      x_start = 20  # Yonboshlardan 5 mm (20px)
-      x_indent = 60  # Xatboshi uchun biroz ichkaridan
+      x_start = 80  # Chap tomondan 2 sm tabiiy bo'sh joy
+      x_indent = 120  # Xatboshi joyi
       wrap_width = font_info['wrap_width']
 
     paragraphs = clean_text.split('\n')
@@ -441,8 +441,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_indent = i == 0 and mode == 'text'
         all_lines.append((line, is_indent))
 
-    y_start = 200  # Tepadan 5 cm (200px) joy
-    max_y = 1380  # Pastki qismidan 5 mm (1380px) joy
+    y_start = 80  # Tepadan 1.5 sm joy (A4 ning aynan yuqori qismidan boshlanadi)
+    max_y = (
+        1300  # Pastdan 1.5 sm joy qolguncha (butun A4 varag'ini to'liq egallaydi)
+    )
     line_height = font_info['size'] + font_info['line_spacing']
 
     pages = []
@@ -459,7 +461,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         y = y_start
 
       current_x = x_indent if is_indent else x_start
-      current_draw.text((current_x, y), line, fill=(20, 30, 130), font=font)
+      # To'q ko'k rangda tabiiy ko'rinish berib yozish
+      current_draw.text((current_x, y), line, fill=(20, 35, 125), font=font)
       y += line_height
 
     pages.append(current_image)
