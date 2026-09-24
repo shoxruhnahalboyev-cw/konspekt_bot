@@ -67,8 +67,8 @@ keep_alive()
 
 TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
 
-# ⚠️ BU YERGA O'ZINGIZNING KANALINGIZ USERNAMENI YOZING (masalan: '@my_channel')
-CHANNEL_USERNAME = '@A_ToolsX'
+# Kanalingiz username-i o'rnatildi
+CHANNEL_USERNAME = '@shoxrux_code'
 
 FONTS = {
     'font1': {
