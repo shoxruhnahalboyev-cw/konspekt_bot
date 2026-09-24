@@ -67,6 +67,9 @@ keep_alive()
 
 TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
 
+# ⚠️ BU YERGA O'ZINGIZNING KANALINGIZ USERNAMENI YOZING (masalan: '@my_channel')
+CHANNEL_USERNAME = '@A_ToolsX'
+
 FONTS = {
     'font1': {
         'name': '✍️ 1. Caveat (14pt, 1.0)',
@@ -120,6 +123,40 @@ FONTS = {
 }
 
 user_data_store = {}
+
+
+async def check_subscription(
+    user_id: int, context: ContextTypes.DEFAULT_TYPE
+) -> bool:
+  """Foydalanuvchi kanalda bor-yo'qligini tekshirish"""
+  try:
+    member = await context.bot.get_chat_member(
+        chat_id=CHANNEL_USERNAME, user_id=user_id
+    )
+    if member.status in ['creator', 'administrator', 'member']:
+      return True
+    return False
+  except Exception:
+    return False
+
+
+def sub_keyboard():
+  """Kanalga a'zo bo'lish tugmasi"""
+  clean_username = CHANNEL_USERNAME.replace('@', '')
+  keyboard = [
+      [
+          InlineKeyboardButton(
+              "📢 Kanalimizga a'zo bo'lish",
+              url=f'https://t.me/{clean_username}',
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "✅ A'zo bo'ldim / Tekshirish", callback_data='check_sub'
+          )
+      ],
+  ]
+  return InlineKeyboardMarkup(keyboard)
 
 
 def main_menu_keyboard():
@@ -178,6 +215,17 @@ def fonts_inline_keyboard():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if not update.message:
     return
+  user_id = update.message.from_user.id
+
+  if not await check_subscription(user_id, context):
+    await update.message.reply_text(
+        "⚠️ **Botdan foydalanish uchun avval kanalimizga a'zo bo'ling!**\n\nA'zo"
+        " bo'lgach, 'Tekshirish' tugmasini bosing.",
+        parse_mode='Markdown',
+        reply_markup=sub_keyboard(),
+    )
+    return
+
   welcome_text = (
       "Salom! Men matnlaringizni A4 varaqli qo'lyozma konspektga aylantirib"
       " beruvchi botman. 📝\n\nKatta matn bo'lsa ham bot avtomatik sahifalarga"
@@ -190,15 +238,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if not update.message or not update.message.text:
-    if update.message:
-      await update.message.reply_text(
-          'Iltimos, faqat matnli xabar yuboring! 📝',
-          reply_markup=main_menu_keyboard(),
-      )
+    return
+
+  user_id = update.message.from_user.id
+
+  # Kanal a'zoligini tekshiramiz
+  if not await check_subscription(user_id, context):
+    await update.message.reply_text(
+        "⚠️ **Botdan foydalanish uchun avval kanalimizga a'zo bo'ling!**",
+        parse_mode='Markdown',
+        reply_markup=sub_keyboard(),
+    )
     return
 
   text = update.message.text
-  user_id = update.message.from_user.id
 
   if text == '✍️ Yangi konspekt yozish':
     await update.message.reply_text(
@@ -241,6 +294,30 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
   await query.answer()
   user_id = query.from_user.id
   data = query.data
+
+  # Tekshirish tugmasi bosilganda
+  if data == 'check_sub':
+    if await check_subscription(user_id, context):
+      await query.message.delete()
+      await query.message.reply_text(
+          "✅ **Rahmat! Obuna tasdiqlandi.**\nEndi matningizni yuborishingiz"
+          ' mumkin.',
+          parse_mode='Markdown',
+          reply_markup=main_menu_keyboard(),
+      )
+    else:
+      await query.message.reply_text(
+          "❌ **Siz hali kanalga a'zo bo'lmadingiz!**\nIltimos, avval kanalga"
+          ' a\'zo bo\'ling.',
+          reply_markup=sub_keyboard(),
+      )
+    return
+
+  if not await check_subscription(user_id, context):
+    await query.message.reply_text(
+        "⚠️ **Avval kanalga a'zo bo'ling!**", reply_markup=sub_keyboard()
+    )
+    return
 
   if user_id not in user_data_store:
     await query.message.reply_text(
@@ -292,7 +369,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
       x_indent = 110
       wrap_width = font_info['wrap_width']
 
-    # Barcha qatorlarni shakllantirib olamiz
     paragraphs = clean_text.split('\n')
     all_lines = []
 
@@ -305,9 +381,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_indent = i == 0 and mode == 'text'
         all_lines.append((line, is_indent))
 
-    # A4 Varaq parametrlari
     y_start = 80
-    max_y = 1150  # paper.jpg dagi A4 chegara balandligi
+    max_y = 1150
     line_height = font_info['size'] + font_info['line_spacing']
 
     pages = []
@@ -317,7 +392,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     y = y_start
 
     for line, is_indent in all_lines:
-      # Varaq to'lib qolsa, yangi sahifa (A4 varaq) ochamiz
       if y + line_height > max_y:
         pages.append(current_image)
         current_image = Image.open('paper.jpg')
@@ -328,9 +402,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
       current_draw.text((current_x, y), line, fill=(20, 30, 130), font=font)
       y += line_height
 
-    pages.append(current_image)  # Oxirgi sahifani qo'shish
+    pages.append(current_image)
 
-    # Sahifalarni rasmlar to'plami (MediaGroup) qilib yuborish
     media_group = []
     bio_list = []
 
