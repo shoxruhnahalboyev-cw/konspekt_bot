@@ -70,7 +70,7 @@ TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
 CHANNEL_USERNAME = '@shoxrux_code'
 
 # ⚠️ SHU YERGA O'ZINGIZNING TELEGRAM ID-INGIZNI YOZING (@userinfobot'dan bilsangiz bo'ladi)
-ADMIN_ID = 7439126820
+ADMIN_ID = 123456789
 
 
 # --- MA'LUMOTLAR BAZASI (SQLite) ---
@@ -123,49 +123,49 @@ FONTS = {
         'file': 'font1.ttf',
         'size': 32,
         'line_spacing': 10,
-        'wrap_width': 58,
+        'wrap_width': 78,
     },
     'font2': {
         'name': '🖋️ 2. Marck Script (14pt, 1.5)',
         'file': 'font2.ttf',
         'size': 32,
         'line_spacing': 22,
-        'wrap_width': 58,
+        'wrap_width': 78,
     },
     'font3': {
         'name': '👨‍🎓 3. Bad Script (12pt, 1.0)',
         'file': 'font3.ttf',
         'size': 27,
         'line_spacing': 8,
-        'wrap_width': 68,
+        'wrap_width': 88,
     },
     'font4': {
         'name': '⚡ 4. Permanent Marker',
         'file': 'font4.ttf',
         'size': 30,
         'line_spacing': 12,
-        'wrap_width': 55,
+        'wrap_width': 72,
     },
     'font5': {
         'name': '🖊️ 5. Kalam (Oddiy Ruchka)',
         'file': 'font5.ttf',
         'size': 32,
         'line_spacing': 10,
-        'wrap_width': 58,
+        'wrap_width': 78,
     },
     'font6': {
         'name': '✏️ 6. Kalam (Ingichka Ruchka)',
         'file': 'font6.ttf',
         'size': 27,
         'line_spacing': 8,
-        'wrap_width': 68,
+        'wrap_width': 88,
     },
     'font7': {
         'name': '✒️ 7. Kalam (Qalin Ruchka)',
         'file': 'font7.ttf',
         'size': 32,
         'line_spacing': 22,
-        'wrap_width': 58,
+        'wrap_width': 78,
     },
 }
 
@@ -260,7 +260,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
   user = update.message.from_user
 
-  # Foydalanuvchini bazaga qo'shamiz
+  # Foydalanuvchini bazaga saqlash
   add_user(user.id, user.full_name, user.username)
 
   if not await check_subscription(user.id, context):
@@ -293,7 +293,7 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
   else:
     await update.message.reply_text(
-        "❌ Siz bot admini emassiz!", reply_markup=main_menu_keyboard()
+        '❌ Siz bot admini emassiz!', reply_markup=main_menu_keyboard()
     )
 
 
@@ -316,13 +316,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   if text == '✍️ Yangi konspekt yozish':
     await update.message.reply_text(
-        'Konspekt qilmoqchi bo\'lgan matningizni yuboring:',
+        "Konspekt qilmoqchi bo'lgan matningizni yuboring:",
         reply_markup=main_menu_keyboard(),
     )
     return
   elif text == 'ℹ️ Bot haqida':
     about_text = (
-        '🤖 **Konspekt Bot** — Matnlarni A4 formatdagi qo\'lyozma konspekt'
+        "🤖 **Konspekt Bot** — Matnlarni A4 formatdagi qo'lyozma konspekt"
         ' rasmlariga aylantirib beradi.'
     )
     await update.message.reply_text(
@@ -331,7 +331,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
   elif text == '❓ Yordam':
     help_text = (
-        '📌 **Qanday foydalaniladi?**\n1. Matn yuboring (1000+ so\'z bo\'lsa'
+        "📌 **Qanday foydalaniladi?**\n1. Matn yuboring (1000+ so'z bo'lsa"
         " ham bo'laveradi).\n2. Uslubni tanlang.\n3. Shriftni tanlang va tayyor"
         ' A4 sahifalarni oling!'
     )
@@ -368,7 +368,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
       await query.message.reply_text(
           "❌ **Siz hali kanalga a'zo bo'lmadingiz!**\nIltimos, avval kanalga"
-          ' a\'zo bo\'ling.',
+          " a'zo bo'ling.",
           reply_markup=sub_keyboard(),
       )
     return
@@ -390,7 +390,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mode = 'poem' if data == 'mode_poem' else 'text'
     user_data_store[user_id]['mode'] = mode
     await query.edit_message_text(
-        text='Ajoyib! Endi o\'zingizga yoqqan shriftni tanlang:',
+        text="Ajoyib! Endi o'zingizga yoqqan shriftni tanlang:",
         reply_markup=fonts_inline_keyboard(),
     )
     return
@@ -421,12 +421,12 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mode = user_data_store[user_id].get('mode', 'text')
 
     if mode == 'poem':
-      x_start = 160
-      x_indent = 160
-      wrap_width = 32
+      x_start = 100
+      x_indent = 100
+      wrap_width = 45
     else:
-      x_start = 70
-      x_indent = 110
+      x_start = 20  # Yonboshlardan 5 mm (20px)
+      x_indent = 60  # Xatboshi uchun biroz ichkaridan
       wrap_width = font_info['wrap_width']
 
     paragraphs = clean_text.split('\n')
@@ -441,8 +441,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_indent = i == 0 and mode == 'text'
         all_lines.append((line, is_indent))
 
-    y_start = 80
-    max_y = 1150
+    y_start = 200  # Tepadan 5 cm (200px) joy
+    max_y = 1380  # Pastki qismidan 5 mm (1380px) joy
     line_height = font_info['size'] + font_info['line_spacing']
 
     pages = []
@@ -490,7 +490,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.reply_media_group(media=media_group)
     await query.message.reply_text(
-        f"✅ Jami {len(pages)} ta A4 sahifa tayyorlandi!",
+        f'✅ Jami {len(pages)} ta A4 sahifa tayyorlandi!',
         reply_markup=re_select_keyboard,
     )
 
