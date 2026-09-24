@@ -46,7 +46,7 @@ from telegram.ext import (
     filters,
 )
 
-# Render uchun Flask server
+# Render server
 app = Flask('')
 
 
@@ -69,11 +69,10 @@ keep_alive()
 TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
 CHANNEL_USERNAME = '@shoxrux_code'
 
-# ⚠️ O'ZINGIZNING TELEGRAM ID-INGIZNI YOZING
-ADMIN_ID = 7439126820
+# ⚠️ BU YERGA O'Z TELEGRAM ID-INGIZNI YOZING
+ADMIN_ID = 123456789
 
 
-# --- MA'LUMOTLAR BAZASI (SQLite) ---
 def init_db():
   conn = sqlite3.connect('bot_users.db')
   cursor = conn.cursor()
@@ -114,56 +113,55 @@ def get_users_count() -> int:
 
 init_db()
 
-# Shriftlar konfiguratsiyasi (Baza o'lchamlari)
 FONTS = {
     'font1': {
-        'name': '✍️ 1. Caveat (Talaba qo\'lyozmasi)',
+        'name': "✍️ 1. Caveat (Talaba qo'lyozmasi)",
         'file': 'font1.ttf',
-        'base_size': 26,
-        'base_spacing': 8,
-        'wrap_width': 70,
+        'base_size': 32,
+        'base_spacing': 10,
+        'wrap_width': 58,
     },
     'font2': {
         'name': '🖋️ 2. Marck Script',
         'file': 'font2.ttf',
-        'base_size': 26,
-        'base_spacing': 9,
-        'wrap_width': 68,
+        'base_size': 32,
+        'base_spacing': 10,
+        'wrap_width': 56,
     },
     'font3': {
         'name': '👨‍🎓 3. Bad Script',
         'file': 'font3.ttf',
-        'base_size': 24,
-        'base_spacing': 7,
-        'wrap_width': 72,
+        'base_size': 28,
+        'base_spacing': 8,
+        'wrap_width': 62,
     },
     'font4': {
         'name': '⚡ 4. Permanent Marker',
         'file': 'font4.ttf',
-        'base_size': 25,
-        'base_spacing': 9,
-        'wrap_width': 65,
+        'base_size': 30,
+        'base_spacing': 10,
+        'wrap_width': 52,
     },
     'font5': {
         'name': '🖊️ 5. Kalam (Oddiy Ruchka)',
         'file': 'font5.ttf',
-        'base_size': 26,
-        'base_spacing': 8,
-        'wrap_width': 70,
+        'base_size': 32,
+        'base_spacing': 10,
+        'wrap_width': 58,
     },
     'font6': {
         'name': '✏️ 6. Kalam (Ingichka Ruchka)',
         'file': 'font6.ttf',
-        'base_size': 24,
-        'base_spacing': 7,
-        'wrap_width': 72,
+        'base_size': 28,
+        'base_spacing': 8,
+        'wrap_width': 62,
     },
     'font7': {
         'name': '✒️ 7. Kalam (Qalin Ruchka)',
         'file': 'font7.ttf',
-        'base_size': 26,
-        'base_spacing': 9,
-        'wrap_width': 68,
+        'base_size': 32,
+        'base_spacing': 10,
+        'wrap_width': 56,
     },
 }
 
@@ -213,7 +211,7 @@ def mode_inline_keyboard():
       InlineKeyboardButton(
           '📄 Oddiy Matn (A4 Printer)', callback_data='mode_text'
       ),
-      InlineKeyboardButton('📜 She\'r / Qo\'shiq uslubi', callback_data='mode_poem'),
+      InlineKeyboardButton("📜 She'r / Qo'shiq uslubi", callback_data='mode_poem'),
   ]]
   return InlineKeyboardMarkup(keyboard)
 
@@ -257,13 +255,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if not update.message:
     return
   user = update.message.from_user
-
   add_user(user.id, user.full_name, user.username)
 
   if not await check_subscription(user.id, context):
     await update.message.reply_text(
-        "⚠️ **Botdan foydalanish uchun avval kanalimizga a'zo bo'ling!**\n\nA'zo"
-        " bo'lgach, 'Tekshirish' tugmasini bosing.",
+        "⚠️ **Botdan foydalanish uchun avval kanalimizga a'zo bo'ling!**",
         parse_mode='Markdown',
         reply_markup=sub_keyboard(),
     )
@@ -271,8 +267,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   welcome_text = (
       "Salom! Men matnlaringizni A4 varaqli qo'lyozma konspektga aylantirib"
-      " beruvchi botman. 📝\n\nMatningizni yuboring va A4 shaklidagi haqiqiy"
-      ' talaba konspektiga ega bo\'ling!'
+      " beruvchi botman. 📝"
   )
   await update.message.reply_text(
       welcome_text, reply_markup=main_menu_keyboard()
@@ -318,21 +313,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return
   elif text == 'ℹ️ Bot haqida':
-    about_text = (
-        "🤖 **Konspekt Bot** — Matnlarni A4 formatdagi qo'lyozma konspekt"
-        ' rasmlariga aylantirib beradi.'
-    )
     await update.message.reply_text(
-        about_text, parse_mode='Markdown', reply_markup=main_menu_keyboard()
+        "🤖 **Konspekt Bot** — A4 formatdagi qo'lyozma konspekt yaratish uchun.",
+        parse_mode='Markdown',
+        reply_markup=main_menu_keyboard(),
     )
     return
   elif text == '❓ Yordam':
-    help_text = (
-        "📌 **Qanday foydalaniladi?**\n1. Matn yuboring.\n2. Uslubni tanlang.\n3."
-        ' Shriftni tanlang va A4 sahifani oling!'
-    )
     await update.message.reply_text(
-        help_text, parse_mode='Markdown', reply_markup=main_menu_keyboard()
+        '📌 Matn yuboring, uslub va fontni tanlang.',
+        reply_markup=main_menu_keyboard(),
     )
     return
 
@@ -356,15 +346,13 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await check_subscription(user_id, context):
       await query.message.delete()
       await query.message.reply_text(
-          "✅ **Rahmat! Obuna tasdiqlandi.**\nEndi matningizni yuborishingiz"
-          ' mumkin.',
+          '✅ **Rahmat! Obuna tasdiqlandi.**',
           parse_mode='Markdown',
           reply_markup=main_menu_keyboard(),
       )
     else:
       await query.message.reply_text(
-          "❌ **Siz hali kanalga a'zo bo'lmadingiz!**\nIltimos, avval kanalga"
-          " a'zo bo'ling.",
+          "❌ **Siz hali kanalga a'zo bo'lmadingiz!**",
           reply_markup=sub_keyboard(),
       )
     return
@@ -416,67 +404,53 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mode = user_data_store[user_id].get('mode', 'text')
 
-    # MARGINLAR VA PLANETKA TARTIBI
     if mode == 'poem':
       x_start = 140
       x_indent = 140
       wrap_width = 45
     else:
-      x_start = 75  # Chap margin ~1.8 sm
-      x_indent = 110  # Paragraf o'ngroq xatboshi
+      x_start = 80
+      x_indent = 120
       wrap_width = font_info['wrap_width']
 
-    y_start = 75  # Tepadagi margin ~1.5 sm
-    max_y = 1320  # Pastki marja ~1.5 sm bo'sh joygacha
+    y_start = 80
+    max_y = 1320
 
-    # --- DINAMIK FONT VA QATOR ORALIG'INI HISOBLASH ---
     words_count = len(clean_text.split())
-
-    # Harf hajmi va spetsifikatsiyalarini matn uzunligiga moslash
     font_size = font_info['base_size']
     line_spacing = font_info['base_spacing']
 
-    if words_count < 220:
-      font_size += 3
-      line_spacing += 3
-    elif words_count > 380:
+    # Matn hajmiga qarab dinamik font o'lchami
+    if words_count < 150:
+      font_size += 4
+      line_spacing += 4
+    elif words_count > 350:
       font_size -= 2
       line_spacing -= 2
 
     line_height = font_size + line_spacing
     lines_per_page = (max_y - y_start) // line_height
 
-    # --- GAPLARNI KESMASDAN SAHIFALARGA BO'LISH ---
-    raw_paragraphs = clean_text.split('\n')
+    # PARAGRAFLARNI TUTASH YOZISH (Gaplar uzib tashlanmaydi)
+    raw_paragraphs = [p.strip() for p in clean_text.split('\n') if p.strip()]
     pages_lines = []
     current_page_lines = []
 
     for paragraph in raw_paragraphs:
-      paragraph = paragraph.strip()
-      if not paragraph:
-        continue
+      wrapped_lines = textwrap.wrap(paragraph, width=wrap_width)
 
-      # Gaplarni yakunlovchi belgilar orqali bo'lish (., !, ?)
-      sentences = re.split(r'(?<=[.!?]) +', paragraph)
+      for idx, line in enumerate(wrapped_lines):
+        is_indent = idx == 0 and mode == 'text'
 
-      for sentence in sentences:
-        wrapped_sentence = textwrap.wrap(sentence, width=wrap_width)
-        sentence_line_count = len(wrapped_sentence)
+        if len(current_page_lines) >= lines_per_page:
+          pages_lines.append(current_page_lines)
+          current_page_lines = []
 
-        # Agar gap joriy A4 betga sig'masa, gapni TO'LIQ yangi sahifaga o'tkazish
-        if len(current_page_lines) + sentence_line_count > lines_per_page:
-          if current_page_lines:
-            pages_lines.append(current_page_lines)
-            current_page_lines = []
-
-        for idx, line in enumerate(wrapped_sentence):
-          is_indent = idx == 0 and mode == 'text'
-          current_page_lines.append((line, is_indent))
+        current_page_lines.append((line, is_indent))
 
     if current_page_lines:
       pages_lines.append(current_page_lines)
 
-    # --- RASMLARNI YARATISH ---
     pages = []
     font = ImageFont.truetype(font_info['file'], size=font_size)
 
@@ -487,7 +461,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
       for line, is_indent in page_lines:
         current_x = x_indent if is_indent else x_start
-        # Tabiiy ko'k siyoh rangi (Dark Slate Blue / Navy)
         current_draw.text((current_x, y), line, fill=(25, 40, 115), font=font)
         y += line_height
 
@@ -527,7 +500,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def setup_bot_commands(app: Application):
   commands = [
       BotCommand('start', 'Botni qayta ishga tushirish'),
-      BotCommand('help', 'Yordam va ko\'rsatma'),
+      BotCommand('help', "Yordam va ko'rsatma"),
       BotCommand('stat', 'Statistika (Admin)'),
   ]
   await app.bot.set_my_commands(commands)
@@ -535,14 +508,11 @@ async def setup_bot_commands(app: Application):
 
 def main():
   app = Application.builder().token(TOKEN).build()
-
   app.add_handler(CommandHandler('start', start))
   app.add_handler(CommandHandler('help', start))
   app.add_handler(CommandHandler('stat', stat_command))
   app.add_handler(MessageHandler(filters.ALL, handle_message))
   app.add_handler(CallbackQueryHandler(button_click))
-
-  print('Bot ishga tushdi...')
 
   app.post_init = setup_bot_commands
   app.run_polling()
