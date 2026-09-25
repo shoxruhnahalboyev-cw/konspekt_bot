@@ -26,6 +26,7 @@ import sqlite3
 from threading import Thread
 
 from flask import Flask
+from googletrans import Translator
 from PIL import Image, ImageDraw, ImageFont
 from telegram import (
     BotCommand,
@@ -65,9 +66,11 @@ def keep_alive():
 
 keep_alive()
 
-TOKEN = '8851697720:AAFRqozdrRzdXZi1W3RZCL4AbbH5hxjzq-E'
+TOKEN = '8851697720:AAE9w9hfGVA582w9vwumKUds9xw1DZ0ND_A'
 CHANNEL_USERNAME = '@shoxrux_code'
-ADMIN_ID = 7439126820
+ADMIN_ID = 7439126828
+
+translator = Translator()
 
 
 def init_db():
@@ -185,7 +188,6 @@ async def check_subscription(
     return member.status in ['creator', 'administrator', 'member']
   except Exception as e:
     print(f'Obuna tekshirishda xatolik: {e}')
-    # Admin bo'lmasa yoki xatolik bo'lsa xabar bloklanib qolmasligi uchun True qaytariladi
     return True
 
 
@@ -209,11 +211,35 @@ def sub_keyboard():
 def main_menu_keyboard():
   return ReplyKeyboardMarkup(
       [
-          [KeyboardButton('✍️ Yangi konspekt yozish')],
+          [KeyboardButton('✍️ Yangi matn yuborish')],
           [KeyboardButton('ℹ️ Bot haqida'), KeyboardButton('❓ Yordam')],
       ],
       resize_keyboard=True,
   )
+
+
+def action_inline_keyboard():
+  return InlineKeyboardMarkup([
+      [InlineKeyboardButton('📝 Konspekt Yaratish', callback_data='act_konspekt')],
+      [InlineKeyboardButton('🌐 Tarjima Qilish', callback_data='act_translate')],
+  ])
+
+
+def translate_inline_keyboard():
+  return InlineKeyboardMarkup([
+      [
+          InlineKeyboardButton('🇺🇿 UZB ➡️ 🇷🇺 RUS', callback_data='tr_uz_ru'),
+          InlineKeyboardButton('🇷🇺 RUS ➡️ 🇺🇿 UZB', callback_data='tr_ru_uz'),
+      ],
+      [
+          InlineKeyboardButton('🇺🇿 UZB ➡️ 🇬🇧 ENG', callback_data='tr_uz_en'),
+          InlineKeyboardButton('🇬🇧 ENG ➡️ 🇺🇿 UZB', callback_data='tr_en_uz'),
+      ],
+      [
+          InlineKeyboardButton('🇷🇺 RUS ➡️ 🇬🇧 ENG', callback_data='tr_ru_en'),
+          InlineKeyboardButton('🇬🇧 ENG ➡️ 🇷🇺 RUS', callback_data='tr_en_ru'),
+      ],
+  ])
 
 
 def mode_inline_keyboard():
@@ -275,8 +301,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
 
   await update.message.reply_text(
-      'Salom! Matningizni yuboring, uni A4 formatli qoʻlyozmaga aylantirib'
-      ' beraman. 📝',
+      'Salom! Matningizni yuboring, uni konspekt qilishingiz yoki 3 xil tilda'
+      ' tarjima qilishingiz mumkin. 📝🌐',
       reply_markup=main_menu_keyboard(),
   )
 
@@ -305,7 +331,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   if not await check_subscription(user.id, context):
     await update.message.reply_text(
-        f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**",
+        f"⚠️ **Botdan foydalanish mezonlari uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**",
         parse_mode='Markdown',
         reply_markup=sub_keyboard(),
     )
@@ -313,30 +339,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   text = update.message.text
 
-  if text == '✍️ Yangi konspekt yozish':
+  if text == '✍️ Yangi matn yuborish':
     await update.message.reply_text(
-        "Konspekt qilmoqchi bo'lgan matningizni yuboring:",
-        reply_markup=main_menu_keyboard(),
+        "Matningizni yuboring:", reply_markup=main_menu_keyboard()
     )
     return
   elif text == 'ℹ️ Bot haqida':
     await update.message.reply_text(
-        "🤖 **Konspekt Bot** — A4 formatdagi qo'lyozma konspekt yaratish uchun.",
+        "🤖 **Konspekt & Tarjimon Bot** — A4 konspekt yaratish va tarjima qilish"
+        ' xizmati.',
         parse_mode='Markdown',
         reply_markup=main_menu_keyboard(),
     )
     return
   elif text == '❓ Yordam':
     await update.message.reply_text(
-        '📌 Matn yuboring, uslub va fontni tanlang.',
+        "📌 Matn yuboring va keragli amaliyotni (Konspekt yoki Tarjima) tanlang.",
         reply_markup=main_menu_keyboard(),
     )
     return
 
   user_data_store[user.id] = {'text': text, 'mode': 'text'}
   await update.message.reply_text(
-      'Matn qabul qilindi! Yozuv uslubini tanlang:',
-      reply_markup=mode_inline_keyboard(),
+      'Matn qabul qilindi! Nima qilamiz?', reply_markup=action_inline_keyboard()
   )
 
 
@@ -365,6 +390,45 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(
         'Matn topilmadi. Qaytadan yuboring.', reply_markup=main_menu_keyboard()
     )
+    return
+
+  # Amaliyot tanlovi
+  if data == 'act_konspekt':
+    await query.edit_message_text(
+        text='Yozuv uslubini tanlang:', reply_markup=mode_inline_keyboard()
+    )
+    return
+  elif data == 'act_translate':
+    await query.edit_message_text(
+        text='Tarjima yoʻnalishini tanlang:',
+        reply_markup=translate_inline_keyboard(),
+    )
+    return
+
+  # Tarjima jarayoni
+  if data.startswith('tr_'):
+    src, dest = data.split('_')[1], data.split('_')[2]
+    raw_text = user_data_store[user_id]['text']
+
+    await query.edit_message_text(text='⏳ Tarjima qilinmoqda...')
+    try:
+      translated = translator.translate(raw_text, src=src, dest=dest)
+      user_data_store[user_id]['text'] = translated.text  # Tarjimani saqlaymiz
+
+      re_konspekt_keyboard = InlineKeyboardMarkup([[
+          InlineKeyboardButton(
+              '📝 Ushbu tarjimani Konspektga aylantirish',
+              callback_data='act_konspekt',
+          )
+      ]])
+
+      await query.message.reply_text(
+          f'🌐 **Tarjima natijasi:**\n\n{translated.text}',
+          parse_mode='Markdown',
+          reply_markup=re_konspekt_keyboard,
+      )
+    except Exception as e:
+      await query.message.reply_text(f'❌ Tarjimada xatolik boʻldi: {e}')
     return
 
   if data.startswith('mode_'):
@@ -425,14 +489,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if total_height > usable_height:
       while total_height > usable_height and font_size > 20:
         font_size -= 1
-        font = ImageFont.truetype(font_info['file'], size=font_size)
-        lines = wrap_text_by_pixels(clean_text, font, usable_width, draw_dummy)
-        line_spacing = int(font_size * 0.35)
-        line_height = font_size + line_spacing
-        total_height = len(lines) * line_height
-    elif total_height < (usable_height * 0.6) and len(clean_text.split()) > 100:
-      while total_height < (usable_height * 0.85) and font_size < 50:
-        font_size += 1
         font = ImageFont.truetype(font_info['file'], size=font_size)
         lines = wrap_text_by_pixels(clean_text, font, usable_width, draw_dummy)
         line_spacing = int(font_size * 0.35)
