@@ -19,6 +19,7 @@ def keep_alive():
   t.start()
 
 
+import asyncio
 import io
 import os
 import re
@@ -551,17 +552,27 @@ async def setup_bot_commands(app: Application):
   await app.bot.set_my_commands(commands)
 
 
-def main():
-  app = Application.builder().token(TOKEN).build()
-  app.add_handler(CommandHandler('start', start))
-  app.add_handler(CommandHandler('help', start))
-  app.add_handler(CommandHandler('stat', stat_command))
-  app.add_handler(MessageHandler(filters.ALL, handle_message))
-  app.add_handler(CallbackQueryHandler(button_click))
+async def main():
+    init_db()
+    keep_alive()
 
-  app.post_init = setup_bot_commands
-  app.run_polling()
+    application = Application.builder().token(TOKEN).build()
 
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('help', start))
+    application.add_handler(CommandHandler('stat', stat_command))
+    application.add_handler(MessageHandler(filters.ALL, handle_message))
+    application.add_handler(CallbackQueryHandler(button_click))
+
+    await setup_bot_commands(application)
+
+    async with application:
+        await application.start()
+        await application.updater.start_polling(drop_pending_updates=True)
+        await asyncio.Event().wait()
 
 if __name__ == '__main__':
-  main()
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        pass
