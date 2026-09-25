@@ -66,9 +66,9 @@ def keep_alive():
 
 keep_alive()
 
-TOKEN = '8851697720:AAE9w9hfGVA582w9vwumKUds9xw1DZ0ND_A'
+TOKEN = '8851697720:AAHiTdWO3PoDnSFLk2xdVbTR3TPrl8nazJQ'
 CHANNEL_USERNAME = '@shoxrux_code'
-ADMIN_ID = 7439126828
+ADMIN_ID = 7439126820
 
 
 def init_db():
