@@ -65,7 +65,7 @@ def keep_alive():
 
 keep_alive()
 
-TOKEN = '8851697720:AAE9w9hfGVA582w9vwumKUds9xw1DZ0ND_A'
+TOKEN = '8851697720:AAFRqozdrRzdXZi1W3RZCL4AbbH5hxjzq-E'
 CHANNEL_USERNAME = '@shoxrux_code'
 ADMIN_ID = 7439126828
 
