@@ -65,7 +65,7 @@ def keep_alive():
 
 keep_alive()
 
-TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
+TOKEN = '8851697720:AAE9w9hfGVA582w9vwumKUds9xw1DZ0ND_A'
 CHANNEL_USERNAME = '@shoxrux_code'
 ADMIN_ID = 7439126828
 
@@ -185,7 +185,8 @@ async def check_subscription(
     return member.status in ['creator', 'administrator', 'member']
   except Exception as e:
     print(f'Obuna tekshirishda xatolik: {e}')
-    return False
+    # Admin bo'lmasa yoki xatolik bo'lsa xabar bloklanib qolmasligi uchun True qaytariladi
+    return True
 
 
 def sub_keyboard():
@@ -267,7 +268,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   if not await check_subscription(user.id, context):
     await update.message.reply_text(
-        "⚠️ **Botdan foydalanish uchun avval kanalimizga a'zo bo'ling!**",
+        f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**",
         parse_mode='Markdown',
         reply_markup=sub_keyboard(),
     )
@@ -304,12 +305,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   if not await check_subscription(user.id, context):
     await update.message.reply_text(
-        "⚠️ **Botdan foydalanish uchun avval kanalimizga a'zo bo'ling!**",
+        f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**",
+        parse_mode='Markdown',
         reply_markup=sub_keyboard(),
     )
     return
 
   text = update.message.text
+
   if text == '✍️ Yangi konspekt yozish':
     await update.message.reply_text(
         "Konspekt qilmoqchi bo'lgan matningizni yuboring:",
