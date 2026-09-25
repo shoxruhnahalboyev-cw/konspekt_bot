@@ -46,7 +46,7 @@ from telegram.ext import (
     filters,
 )
 
-# Render server uchun Flask
+# Render server uchun Flask web app
 app = Flask('')
 
 
@@ -407,7 +407,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     src, dest = data.split('_')[1], data.split('_')[2]
     raw_text = user_data_store[user_id]['text']
 
-    lang_map = {'uz': 'uzbek', 'ru': 'russian', 'en': 'english'}
+    lang_map = {'uz': 'uz', 'ru': 'ru', 'en': 'en'}
 
     await query.edit_message_text(text='⏳ Tarjima qilinmoqda...')
     try:
