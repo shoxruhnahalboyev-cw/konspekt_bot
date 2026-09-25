@@ -45,7 +45,7 @@ from telegram.ext import (
     filters,
 )
 
-# Render server
+# Render server uchun Flask
 app = Flask('')
 
 
@@ -67,7 +67,7 @@ keep_alive()
 
 TOKEN = '8851697720:AAHk1WNfp63cLBthfDXqQnlsJqGbIrX3S58'
 CHANNEL_USERNAME = '@shoxrux_code'
-ADMIN_ID = 7439126820  # O'zingizning Telegram ID'ingizni kiriting
+ADMIN_ID = 7439126828
 
 
 def init_db():
@@ -143,7 +143,6 @@ FONTS = {
 user_data_store = {}
 
 
-# MATNNI PIKSELLAR BO'YICHA AQLI O'RASH FUNKSIYASI
 def wrap_text_by_pixels(text, font, max_width, draw):
   paragraphs = text.split('\n')
   lines = []
@@ -160,7 +159,6 @@ def wrap_text_by_pixels(text, font, max_width, draw):
     current_line = []
     for word in words:
       test_line = ' '.join(current_line + [word])
-      # Bounding box orqali matn kengligini aniq piksellarda o'lchash
       bbox = draw.textbbox((0, 0), test_line, font=font)
       width = bbox[2] - bbox[0]
 
@@ -185,7 +183,8 @@ async def check_subscription(
         chat_id=CHANNEL_USERNAME, user_id=user_id
     )
     return member.status in ['creator', 'administrator', 'member']
-  except Exception:
+  except Exception as e:
+    print(f'Obuna tekshirishda xatolik: {e}')
     return False
 
 
@@ -290,6 +289,10 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ' ta**',
         parse_mode='Markdown',
     )
+  else:
+    await update.message.reply_text(
+        '❌ Siz bot admini emassiz!', reply_markup=main_menu_keyboard()
+    )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -309,15 +312,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
   text = update.message.text
   if text == '✍️ Yangi konspekt yozish':
     await update.message.reply_text(
-        "Konspekt qilmoqchi bo'lgan matningizni yuboring:"
+        "Konspekt qilmoqchi bo'lgan matningizni yuboring:",
+        reply_markup=main_menu_keyboard(),
     )
     return
   elif text == 'ℹ️ Bot haqida':
-    await update.message.reply_text("🤖 A4 qo'lyozma konspekt yaratuvchi bot.")
+    await update.message.reply_text(
+        "🤖 **Konspekt Bot** — A4 formatdagi qo'lyozma konspekt yaratish uchun.",
+        parse_mode='Markdown',
+        reply_markup=main_menu_keyboard(),
+    )
     return
   elif text == '❓ Yordam':
     await update.message.reply_text(
-        '📌 Matn yuboring va mos shriftni tanlang.'
+        '📌 Matn yuboring, uslub va fontni tanlang.',
+        reply_markup=main_menu_keyboard(),
     )
     return
 
@@ -390,7 +399,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mode = user_data_store[user_id].get('mode', 'text')
 
-    # A4 BAZA MAYDONI (paper.jpg rasmingiz o'lchamlari bo'yicha)
     base_img = Image.open('paper.jpg')
     img_w, img_h = base_img.size
     draw_dummy = ImageDraw.Draw(base_img)
@@ -403,7 +411,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     usable_width = img_w - margin_left - margin_right
     usable_height = img_h - margin_top - margin_bottom
 
-    # DINAMIK SHRFT O'LCHAMINI HISOBLASH (Varaqni ideal to'ldirish uchun)
     font_size = font_info['default_size']
     font = ImageFont.truetype(font_info['file'], size=font_size)
 
@@ -412,7 +419,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     line_height = font_size + line_spacing
     total_height = len(lines) * line_height
 
-    # Agar matn 1 ta betga sig'maydigan bo'lsa yoki judayam kam bo'lsa, moslashtiramiz
     if total_height > usable_height:
       while total_height > usable_height and font_size > 20:
         font_size -= 1
@@ -422,7 +428,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         line_height = font_size + line_spacing
         total_height = len(lines) * line_height
     elif total_height < (usable_height * 0.6) and len(clean_text.split()) > 100:
-      # Agar matn kam bo'lsa, fontni kattalashtirib pastki bo'shliqni yoqotamiz
       while total_height < (usable_height * 0.85) and font_size < 50:
         font_size += 1
         font = ImageFont.truetype(font_info['file'], size=font_size)
@@ -431,7 +436,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         line_height = font_size + line_spacing
         total_height = len(lines) * line_height
 
-    # SAHIFALARGA BO'LISH VA CHIZISH
     max_lines_per_page = max(1, usable_height // line_height)
     pages_lines = [
         lines[i : i + max_lines_per_page]
@@ -478,13 +482,24 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(f'❌ Xatolik yuz berdi: {e}')
 
 
+async def setup_bot_commands(app: Application):
+  commands = [
+      BotCommand('start', 'Botni qayta ishga tushirish'),
+      BotCommand('help', "Yordam va ko'rsatma"),
+      BotCommand('stat', 'Statistika (Admin)'),
+  ]
+  await app.bot.set_my_commands(commands)
+
+
 def main():
   app = Application.builder().token(TOKEN).build()
   app.add_handler(CommandHandler('start', start))
+  app.add_handler(CommandHandler('help', start))
   app.add_handler(CommandHandler('stat', stat_command))
   app.add_handler(MessageHandler(filters.ALL, handle_message))
   app.add_handler(CallbackQueryHandler(button_click))
 
+  app.post_init = setup_bot_commands
   app.run_polling()
 
 
