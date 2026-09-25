@@ -25,8 +25,8 @@ import re
 import sqlite3
 from threading import Thread
 
+from deep_translator import GoogleTranslator
 from flask import Flask
-from googletrans import Translator
 from PIL import Image, ImageDraw, ImageFont
 from telegram import (
     BotCommand,
@@ -69,8 +69,6 @@ keep_alive()
 TOKEN = '8851697720:AAE9w9hfGVA582w9vwumKUds9xw1DZ0ND_A'
 CHANNEL_USERNAME = '@shoxrux_code'
 ADMIN_ID = 7439126828
-
-translator = Translator()
 
 
 def init_db():
@@ -331,7 +329,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   if not await check_subscription(user.id, context):
     await update.message.reply_text(
-        f"⚠️ **Botdan foydalanish mezonlari uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**",
+        f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**",
         parse_mode='Markdown',
         reply_markup=sub_keyboard(),
     )
@@ -341,12 +339,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
   if text == '✍️ Yangi matn yuborish':
     await update.message.reply_text(
-        "Matningizni yuboring:", reply_markup=main_menu_keyboard()
+        'Matningizni yuboring:', reply_markup=main_menu_keyboard()
     )
     return
   elif text == 'ℹ️ Bot haqida':
     await update.message.reply_text(
-        "🤖 **Konspekt & Tarjimon Bot** — A4 konspekt yaratish va tarjima qilish"
+        '🤖 **Konspekt & Tarjimon Bot** — A4 konspekt yaratish va tarjima qilish'
         ' xizmati.',
         parse_mode='Markdown',
         reply_markup=main_menu_keyboard(),
@@ -354,7 +352,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
   elif text == '❓ Yordam':
     await update.message.reply_text(
-        "📌 Matn yuboring va keragli amaliyotni (Konspekt yoki Tarjima) tanlang.",
+        '📌 Matn yuboring va keragli amaliyotni (Konspekt yoki Tarjima)'
+        ' tanlang.',
         reply_markup=main_menu_keyboard(),
     )
     return
@@ -392,7 +391,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return
 
-  # Amaliyot tanlovi
   if data == 'act_konspekt':
     await query.edit_message_text(
         text='Yozuv uslubini tanlang:', reply_markup=mode_inline_keyboard()
@@ -405,15 +403,18 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return
 
-  # Tarjima jarayoni
   if data.startswith('tr_'):
     src, dest = data.split('_')[1], data.split('_')[2]
     raw_text = user_data_store[user_id]['text']
 
+    lang_map = {'uz': 'uzbek', 'ru': 'russian', 'en': 'english'}
+
     await query.edit_message_text(text='⏳ Tarjima qilinmoqda...')
     try:
-      translated = translator.translate(raw_text, src=src, dest=dest)
-      user_data_store[user_id]['text'] = translated.text  # Tarjimani saqlaymiz
+      translated_text = GoogleTranslator(
+          source=lang_map[src], target=lang_map[dest]
+      ).translate(raw_text)
+      user_data_store[user_id]['text'] = translated_text
 
       re_konspekt_keyboard = InlineKeyboardMarkup([[
           InlineKeyboardButton(
@@ -423,7 +424,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
       ]])
 
       await query.message.reply_text(
-          f'🌐 **Tarjima natijasi:**\n\n{translated.text}',
+          f'🌐 **Tarjima natijasi:**\n\n{translated_text}',
           parse_mode='Markdown',
           reply_markup=re_konspekt_keyboard,
       )

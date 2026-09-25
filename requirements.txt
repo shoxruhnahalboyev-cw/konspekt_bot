@@ -1,4 +1,4 @@
 python-telegram-bot==20.3
 Pillow
 Flask
-googletrans==3.1.0a0
+deep-translator
