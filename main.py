@@ -26,7 +26,7 @@ import re
 import sqlite3
 from threading import Thread
 
-from deep_translator import GoogleTranslator
+import mtranslate
 from flask import Flask
 from PIL import Image, ImageDraw, ImageFont
 from telegram import (
@@ -220,7 +220,6 @@ def main_menu_keyboard():
 def action_inline_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('📝 Konspekt Yaratish', callback_data='act_konspekt')],
-        [InlineKeyboardButton('🌐 Tarjima Qilish', callback_data='act_translate')],
         [InlineKeyboardButton('🌐➡️📝 Tarjima va Konspekt Yaratish', callback_data='act_trans_and_konspekt')],
     ])
 
@@ -338,47 +337,63 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == '✍️ Yangi matn yuborish':
+        user_data_store[user.id] = {}
         await update.message.reply_text(
             'Nima qilmoqchisiz? Kerakli xizmatni tanlang:', reply_markup=action_inline_keyboard()
         )
         return
     elif text == 'ℹ️ Bot haqida':
         await update.message.reply_text(
-            '🤖 **Konspekt & Tarjimon Bot** — A4 konspekt yaratish va tarjima qilish xizmati.',
+            '🤖 **Konspekt Bot** — A4 konspekt yaratish xizmati.',
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard(),
         )
         return
     elif text == '❓ Yordam':
         await update.message.reply_text(
-            '📌 Avval harakat turini tanlang, so\'ngra matningizni yuboring.',
+            '📌 Avval xizmat turini tanlang, so\'ngra matningizni yuboring.',
             reply_markup=main_menu_keyboard(),
         )
         return
 
-    # Foydalanuvchi tanlagan oqimga qarab matnni saqlaymiz
     user_info = user_data_store.get(user.id, {})
-    user_info['text'] = text
-    user_data_store[user.id] = user_info
-
     action = user_info.get('action')
 
     if action == 'konspekt':
+        user_info['text'] = text
+        user_data_store[user.id] = user_info
         await update.message.reply_text(
             'Yozuv uslubini tanlang:', reply_markup=mode_inline_keyboard()
         )
-    elif action == 'translate':
-        await update.message.reply_text(
-            'Tarjima yoʻnalishini tanlang:', reply_markup=translate_inline_keyboard()
-        )
     elif action == 'trans_and_konspekt':
-        await update.message.reply_text(
-            'Birinchi qaysi tildan qaysi tilga tarjima qilamiz?', reply_markup=translate_inline_keyboard()
-        )
+        if 'tr_pair' not in user_info:
+            await update.message.reply_text(
+                '⚠️ Iltimos, avval tarjima yoʻnalishini (tillar juftligini) tanlang!'
+            )
+            return
+
+        user_info['raw_text'] = text
+        user_data_store[user.id] = user_info
+
+        src, dest = user_info['tr_pair']
+        await update.message.reply_text('⏳ Matn tarjima qilinmoqda...')
+        try:
+            translated_text = mtranslate.translate(text, dest, src)
+            user_data_store[user.id]['text'] = translated_text
+            await update.message.reply_text(
+                f'🤖 **Tarjima natijasi:**\n\n{translated_text}\n\nEndi yozuv uslubini tanlang:',
+                parse_mode='Markdown',
+                reply_markup=mode_inline_keyboard()
+            )
+        except Exception as e:
+            user_data_store[user.id]['text'] = text
+            await update.message.reply_text(
+                f"⚠️ Tarjimada xatolik bo'ldi. Original matn saqlandi. Yozuv uslubini tanlang:",
+                reply_markup=mode_inline_keyboard()
+            )
     else:
-        # Agar foydalanuvchi harakat tanlamagan bo'lsa
         await update.message.reply_text(
-            'Matn qabul qilindi! Nima qilamiz?', reply_markup=action_inline_keyboard()
+            'Iltimos, avval kerakli xizmat turini tanlang:', reply_markup=action_inline_keyboard()
         )
 
 
@@ -403,61 +418,38 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # Amalni tanlash bosqichlari
-    if data in ['act_konspekt', 'act_translate', 'act_trans_and_konspekt']:
-        action_map = {
-            'act_konspekt': 'konspekt',
-            'act_translate': 'translate',
-            'act_trans_and_konspekt': 'trans_and_konspekt'
-        }
-        
+    if data == 'act_konspekt':
+        user_data_store[user_id] = {'action': 'konspekt'}
+        await query.edit_message_text(
+            text="📥 **Konspekt uchun matningizni yuboring:**",
+            parse_mode='Markdown'
+        )
+        return
+
+    if data == 'act_trans_and_konspekt':
+        user_data_store[user_id] = {'action': 'trans_and_konspekt'}
+        await query.edit_message_text(
+            text="🌐 Birinchi qaysi tildan qaysi tilga tarjima qilamiz? Tanlang:",
+            reply_markup=translate_inline_keyboard()
+        )
+        return
+
+    if data.startswith('tr_'):
+        src, dest = data.split('_')[1], data.split('_')[2]
         user_info = user_data_store.get(user_id, {})
-        user_info['action'] = action_map[data]
+        user_info['tr_pair'] = (src, dest)
         user_data_store[user_id] = user_info
 
         await query.edit_message_text(
-            text="📥 Ajoyib! Endi menga konspekt yoki tarjima qilinadigan **matningizni yuboring**:",
+            text="📥 Ajoyib! Endi **tarjima qilib konspekt qilinadigan matningizni yuboring**:",
             parse_mode='Markdown'
         )
         return
 
     if user_id not in user_data_store or 'text' not in user_data_store[user_id]:
         await query.message.reply_text(
-            'Matn topilmadi. Qaytadan matn yuboring.', reply_markup=main_menu_keyboard()
+            'Matn topilmadi. Qaytadan harakatni tanlang va matn yuboring.', reply_markup=main_menu_keyboard()
         )
-        return
-
-    if data.startswith('tr_'):
-        src, dest = data.split('_')[1], data.split('_')[2]
-        raw_text = user_data_store[user_id]['text']
-
-        lang_map = {'uz': 'uz', 'ru': 'ru', 'en': 'en'}
-
-        await query.edit_message_text(text='⏳ Tarjima qilinmoqda...')
-        try:
-            translated_text = GoogleTranslator(source=lang_map[src], target=lang_map[dest]).translate(raw_text)
-            user_data_store[user_id]['text'] = translated_text
-
-            # Agar "Tarjima + Konspekt" tanlangan bo'lsa, avtomatik uslub tanlashga o'tadi
-            if user_data_store[user_id].get('action') == 'trans_and_konspekt':
-                await query.message.reply_text(
-                    f'🤖 **Tarjima natijasi:**\n\n{translated_text}\n\nEndi yozuv uslubini tanlang:',
-                    parse_mode='Markdown',
-                    reply_markup=mode_inline_keyboard()
-                )
-            else:
-                re_konspekt_keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton('Ushbu tarjimani Konspektga aylantirish', callback_data='act_konspekt')]
-                ])
-
-                await query.message.reply_text(
-                    f'🤖 **Tarjima natijasi:**\n\n{translated_text}',
-                    parse_mode='Markdown',
-                    reply_markup=re_konspekt_keyboard
-                )
-        except Exception as e:
-            user_data_store[user_id]['text'] = raw_text
-            await query.message.reply_text(f"⚠️ Tarjima serverida xatolik: {e}")
         return
 
     if data.startswith('mode_'):
