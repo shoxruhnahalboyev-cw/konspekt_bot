@@ -478,8 +478,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user_info = user_data_store.get(user_id)
         raw_text = user_info['text']
+        
+        # Xatosiz va xavfsiz tozalash: barcha harflar, raqamlar, tinish belgilari va yangi qatorlar saqlanadi
         clean_text = re.sub(
-            r'[^^\w\s\d.,!?\"\'\-\—:;()№%@\"«»QWERTZUIOPASDFGHJKLZXCVBNMqwertzuiopasdfghjklycvbnmğ-ña-яЎЎҚҚҒҒҲҲ]',
+            r'[^a-zA-Z0-9\s.,!?\"\'\-\—:;()№%@«»а-яА-ЯёЁo‘O‘g‘G‘o’O’g’G’]',
             '',
             raw_text,
         )
