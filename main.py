@@ -24,9 +24,9 @@ import io
 import os
 import re
 import sqlite3
+from datetime import datetime
 from threading import Thread
 
-import mtranslate
 from flask import Flask
 from PIL import Image, ImageDraw, ImageFont
 from telegram import (
@@ -122,29 +122,29 @@ FONTS = {
     'font1': {
         'name': "✍️ 1. Caveat (Talaba qo'lyozmasi)",
         'file': 'font1.ttf',
-        'default_size': 36,
+        'default_size': 38,
     },
-    'font2': {'name': '🖋️ 2. Marck Script', 'file': 'font2.ttf', 'default_size': 34},
-    'font3': {'name': '👨‍🎓 3. Bad Script', 'file': 'font3.ttf', 'default_size': 32},
+    'font2': {'name': '🖋️ 2. Marck Script', 'file': 'font2.ttf', 'default_size': 36},
+    'font3': {'name': '👨‍🎓 3. Bad Script', 'file': 'font3.ttf', 'default_size': 34},
     'font4': {
         'name': '⚡ 4. Permanent Marker',
         'file': 'font4.ttf',
-        'default_size': 30,
+        'default_size': 32,
     },
     'font5': {
         'name': '🖊️ 5. Kalam (Oddiy Ruchka)',
         'file': 'font5.ttf',
-        'default_size': 34,
+        'default_size': 36,
     },
     'font6': {
         'name': '✏️ 6. Kalam (Ingichka Ruchka)',
         'file': 'font6.ttf',
-        'default_size': 30,
+        'default_size': 32,
     },
     'font7': {
         'name': '✒️ 7. Kalam (Qalin Ruchka)',
         'file': 'font7.ttf',
-        'default_size': 34,
+        'default_size': 36,
     },
 }
 
@@ -184,18 +184,6 @@ def wrap_text_by_pixels(text, font, max_width, draw):
     return lines
 
 
-def safe_translate(text, to_lang, from_lang):
-    """Ishonchli va xatosiz tarjima funksiyasi"""
-    for _ in range(3):
-        try:
-            res = mtranslate.translate(text, to_lang, from_lang)
-            if res:
-                return res
-        except Exception:
-            continue
-    return None
-
-
 async def check_subscription(
     user_id: int, context: ContextTypes.DEFAULT_TYPE
 ) -> bool:
@@ -229,7 +217,7 @@ def sub_keyboard():
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
         [
-            [KeyboardButton('✍️ Yangi matn yuborish')],
+            [KeyboardButton('✍️ Yangi konspekt yaratish')],
             [KeyboardButton('ℹ️ Bot haqida'), KeyboardButton('❓ Yordam')],
         ],
         resize_keyboard=True,
@@ -238,34 +226,17 @@ def main_menu_keyboard():
 
 def action_inline_keyboard():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📝 Konspekt Yaratish', callback_data='act_konspekt')],
-        [InlineKeyboardButton('🌐➡️📝 Tarjima va Konspekt Yaratish', callback_data='act_trans_and_konspekt')],
-    ])
-
-
-def translate_inline_keyboard():
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton('🇺🇿 UZB ➡️ 🇷🇺 RUS', callback_data='tr_uz_ru'),
-            InlineKeyboardButton('🇷🇺 RUS ➡️ 🇺🇿 UZB', callback_data='tr_ru_uz'),
-        ],
-        [
-            InlineKeyboardButton('🇺🇿 UZB ➡️ 🇬🇧 ENG', callback_data='tr_uz_en'),
-            InlineKeyboardButton('🇬🇧 ENG ➡️ 🇺🇿 UZB', callback_data='tr_en_uz'),
-        ],
-        [
-            InlineKeyboardButton('🇷🇺 RUS ➡️ 🇬🇧 ENG', callback_data='tr_ru_en'),
-            InlineKeyboardButton('🇬🇧 ENG ➡️ 🇷🇺 RUS', callback_data='tr_en_ru'),
-        ],
+        [InlineKeyboardButton('📄 Oddiy Konspekt', callback_data='act_konspekt')],
+        [InlineKeyboardButton('📌 Sarlavha va Sana bilan Konspekt', callback_data='act_title_konspekt')],
     ])
 
 
 def mode_inline_keyboard():
     return InlineKeyboardMarkup([[
         InlineKeyboardButton(
-            '📄 Oddiy Matn (A4 Printer)', callback_data='mode_text'
+            '📄 Standart Matn (A4)', callback_data='mode_text'
         ),
-        InlineKeyboardButton("📜 She'r / Qo'shiq uslubi", callback_data='mode_poem'),
+        InlineKeyboardButton("📜 She'r / Sheriy tuzilish", callback_data='mode_poem'),
     ]])
 
 
@@ -319,7 +290,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        'Salom! Kerakli xizmat turini tanlang:',
+        'Salom! Konspekt rejimini tanlang:',
         reply_markup=action_inline_keyboard(),
     )
 
@@ -355,66 +326,45 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
 
-    if text == '✍️ Yangi matn yuborish':
+    if text == '✍️ Yangi konspekt yaratish':
         user_data_store[user.id] = {}
         await update.message.reply_text(
-            'Nima qilmoqchisiz? Kerakli xizmatni tanlang:', reply_markup=action_inline_keyboard()
+            'Kerakli konspekt turini tanlang:', reply_markup=action_inline_keyboard()
         )
         return
     elif text == 'ℹ️ Bot haqida':
         await update.message.reply_text(
-            '🤖 **Konspekt Bot** — A4 konspekt yaratish xizmati.',
+            '🤖 **Talaba Konspekt Bot** — Matnlaringizni xuddi talaba daftardagidek chiroyli qo\'lyozma A4 konspektga aylantirib beradi.',
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard(),
         )
         return
     elif text == '❓ Yordam':
         await update.message.reply_text(
-            '📌 Avval xizmat turini tanlang, so\'ngra matningizni yuboring.',
+            '📌 Avval xizmat turini tanlang, so\'ng matn yuboring.',
             reply_markup=main_menu_keyboard(),
         )
         return
 
     user_info = user_data_store.get(user.id, {})
-    action = user_info.get('action')
+    state = user_info.get('state')
 
-    if action == 'konspekt':
+    if state == 'awaiting_title':
+        user_info['title'] = text
+        user_info['state'] = 'awaiting_text'
+        user_data_store[user.id] = user_info
+        await update.message.reply_text(
+            '✅ Sarlavha qabul qilindi!\n\nEndi konspektning **asosiy matnini** yuboring:'
+        )
+    elif state == 'awaiting_text' or user_info.get('action') == 'konspekt':
         user_info['text'] = text
         user_data_store[user.id] = user_info
         await update.message.reply_text(
             'Yozuv uslubini tanlang:', reply_markup=mode_inline_keyboard()
         )
-    elif action == 'trans_and_konspekt':
-        if 'tr_pair' not in user_info:
-            await update.message.reply_text(
-                '⚠️ Iltimos, avval tarjima yoʻnalishini (tillar juftligini) tanlang!'
-            )
-            return
-
-        user_info['raw_text'] = text
-        user_data_store[user.id] = user_info
-
-        src, dest = user_info['tr_pair']
-        msg = await update.message.reply_text('⏳ Matn tarjima qilinmoqda...')
-        
-        translated_text = safe_translate(text, dest, src)
-        
-        if translated_text:
-            user_data_store[user.id]['text'] = translated_text
-            await msg.edit_text(
-                f'🤖 **Tarjima natijasi:**\n\n{translated_text}\n\nEndi yozuv uslubini tanlang:',
-                parse_mode='Markdown',
-                reply_markup=mode_inline_keyboard()
-            )
-        else:
-            user_data_store[user.id]['text'] = text
-            await msg.edit_text(
-                f"⚠️ Tarjimada xatolik bo'ldi. Asl matningiz saqlandi. Yozuv uslubini tanlang:",
-                reply_markup=mode_inline_keyboard()
-            )
     else:
         await update.message.reply_text(
-            'Iltimos, avval kerakli xizmat turini tanlang:', reply_markup=action_inline_keyboard()
+            'Iltimos, avval kerakli konspekt turini tanlang:', reply_markup=action_inline_keyboard()
         )
 
 
@@ -440,36 +390,24 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == 'act_konspekt':
-        user_data_store[user_id] = {'action': 'konspekt'}
+        user_data_store[user_id] = {'action': 'konspekt', 'state': 'awaiting_text'}
         await query.edit_message_text(
             text="📥 **Konspekt uchun matningizni yuboring:**",
             parse_mode='Markdown'
         )
         return
 
-    if data == 'act_trans_and_konspekt':
-        user_data_store[user_id] = {'action': 'trans_and_konspekt'}
+    if data == 'act_title_konspekt':
+        user_data_store[user_id] = {'action': 'title_konspekt', 'state': 'awaiting_title'}
         await query.edit_message_text(
-            text="🌐 Birinchi qaysi tildan qaysi tilga tarjima qilamiz? Tanlang:",
-            reply_markup=translate_inline_keyboard()
-        )
-        return
-
-    if data.startswith('tr_'):
-        src, dest = data.split('_')[1], data.split('_')[2]
-        user_info = user_data_store.get(user_id, {})
-        user_info['tr_pair'] = (src, dest)
-        user_data_store[user_id] = user_info
-
-        await query.edit_message_text(
-            text="📥 Ajoyib! Endi **tarjima qilib konspekt qilinadigan matningizni yuboring**:",
+            text="📌 **Mavzu sarlavhasini (Mavzu nomini) yuboring:**\n*(Masalan: O'zbekiston Tarixi - 5-Mavzu)*",
             parse_mode='Markdown'
         )
         return
 
     if user_id not in user_data_store or 'text' not in user_data_store[user_id]:
         await query.message.reply_text(
-            'Matn topilmadi. Qaytadan harakatni tanlang va matn yuboring.', reply_markup=main_menu_keyboard()
+            'Matn topilmadi. Qaytadan harakatni tanlang.', reply_markup=main_menu_keyboard()
         )
         return
 
@@ -499,6 +437,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user_info = user_data_store.get(user_id)
         raw_text = user_info['text']
+        title_text = user_info.get('title', '')
         
         clean_text = re.sub(
             r'[^a-zA-Z0-9\s.,!?\"\'\-\—:;()№%@«»а-яА-ЯёЁo‘O‘g‘G‘o’O’g’G’]',
@@ -512,10 +451,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         img_w, img_h = base_img.size
         draw_dummy = ImageDraw.Draw(base_img)
 
-        # MARGINLAR VA CHEKLAR TALABA DAFTARIGA MOSLASHTIRILDI (TEPADAN BOSHLANADI)
-        margin_left = 90 if mode == 'text' else 140
-        margin_right = 90
-        margin_top = 100
+        # TALABA DAFTARI CHEKLARI (Haqiqiy daftar shakli)
+        margin_left = 90 if mode == 'text' else 150
+        margin_right = 80
+        margin_top = 80
         margin_bottom = 80
 
         usable_width = img_w - margin_left - margin_right
@@ -535,10 +474,27 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         pages = []
-        for p_lines in pages_lines:
+        today_date = datetime.now().strftime("%d.%m.%Y")
+
+        for page_num, p_lines in enumerate(pages_lines):
             page_img = Image.open('paper.jpg')
             draw = ImageDraw.Draw(page_img)
             y = margin_top
+
+            # FAQAT BIRINCHI SAHIFADA SARLAVHA VA SANA YOZILADI
+            if page_num == 0:
+                # 1. Sana (Yuqori o'ng burchakda)
+                date_font = ImageFont.truetype(font_info['file'], size=int(font_size * 0.75))
+                draw.text((img_w - margin_right - 140, y - 20), today_date, fill=(180, 40, 40), font=date_font)
+
+                # 2. Sarlavha (O'rtada, qizil/to'q ruchka bilan)
+                if title_text:
+                    title_font = ImageFont.truetype(font_info['file'], size=int(font_size * 1.15))
+                    t_bbox = draw.textbbox((0, 0), title_text, font=title_font)
+                    t_w = t_bbox[2] - t_bbox[0]
+                    t_x = (img_w - t_w) // 2
+                    draw.text((t_x, y + 20), title_text, fill=(160, 20, 20), font=title_font)
+                    y += line_height * 2
 
             for line in p_lines:
                 draw.text((margin_left, y), line, fill=(20, 35, 110), font=font)
