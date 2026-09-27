@@ -88,26 +88,32 @@ def init_db():
 
 
 def add_user(user_id: int, full_name: str, username: str):
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        '''
-        INSERT OR IGNORE INTO users (user_id, full_name, username) 
-        VALUES (?, ?, ?)
-    ''',
-        (user_id, full_name, username),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('bot_users.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            INSERT OR IGNORE INTO users (user_id, full_name, username) 
+            VALUES (?, ?, ?)
+        ''',
+            (user_id, full_name, username),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"DB error: {e}")
 
 
 def get_users_count() -> int:
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM users')
-    count = cursor.fetchone()[0]
-    conn.close()
-    return count
+    try:
+        conn = sqlite3.connect('bot_users.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users')
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+    except Exception:
+        return 0
 
 
 init_db()
@@ -116,29 +122,29 @@ FONTS = {
     'font1': {
         'name': "✍️ 1. Caveat (Talaba qo'lyozmasi)",
         'file': 'font1.ttf',
-        'default_size': 38,
+        'default_size': 36,
     },
-    'font2': {'name': '🖋️ 2. Marck Script', 'file': 'font2.ttf', 'default_size': 36},
-    'font3': {'name': '👨‍🎓 3. Bad Script', 'file': 'font3.ttf', 'default_size': 34},
+    'font2': {'name': '🖋️ 2. Marck Script', 'file': 'font2.ttf', 'default_size': 34},
+    'font3': {'name': '👨‍🎓 3. Bad Script', 'file': 'font3.ttf', 'default_size': 32},
     'font4': {
         'name': '⚡ 4. Permanent Marker',
         'file': 'font4.ttf',
-        'default_size': 32,
+        'default_size': 30,
     },
     'font5': {
         'name': '🖊️ 5. Kalam (Oddiy Ruchka)',
         'file': 'font5.ttf',
-        'default_size': 36,
+        'default_size': 34,
     },
     'font6': {
         'name': '✏️ 6. Kalam (Ingichka Ruchka)',
         'file': 'font6.ttf',
-        'default_size': 32,
+        'default_size': 30,
     },
     'font7': {
         'name': '✒️ 7. Kalam (Qalin Ruchka)',
         'file': 'font7.ttf',
-        'default_size': 36,
+        'default_size': 34,
     },
 }
 
@@ -152,6 +158,7 @@ def wrap_text_by_pixels(text, font, max_width, draw):
     for paragraph in paragraphs:
         paragraph = paragraph.strip()
         if not paragraph:
+            lines.append('')
             continue
 
         words = paragraph.split()
@@ -175,6 +182,18 @@ def wrap_text_by_pixels(text, font, max_width, draw):
             lines.append(' '.join(current_line))
 
     return lines
+
+
+def safe_translate(text, to_lang, from_lang):
+    """Ishonchli va xatosiz tarjima funksiyasi"""
+    for _ in range(3):
+        try:
+            res = mtranslate.translate(text, to_lang, from_lang)
+            if res:
+                return res
+        except Exception:
+            continue
+    return None
 
 
 async def check_subscription(
@@ -376,19 +395,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data_store[user.id] = user_info
 
         src, dest = user_info['tr_pair']
-        await update.message.reply_text('⏳ Matn tarjima qilinmoqda...')
-        try:
-            translated_text = mtranslate.translate(text, dest, src)
+        msg = await update.message.reply_text('⏳ Matn tarjima qilinmoqda...')
+        
+        translated_text = safe_translate(text, dest, src)
+        
+        if translated_text:
             user_data_store[user.id]['text'] = translated_text
-            await update.message.reply_text(
+            await msg.edit_text(
                 f'🤖 **Tarjima natijasi:**\n\n{translated_text}\n\nEndi yozuv uslubini tanlang:',
                 parse_mode='Markdown',
                 reply_markup=mode_inline_keyboard()
             )
-        except Exception as e:
+        else:
             user_data_store[user.id]['text'] = text
-            await update.message.reply_text(
-                f"⚠️ Tarjimada xatolik bo'ldi. Original matn saqlandi. Yozuv uslubini tanlang:",
+            await msg.edit_text(
+                f"⚠️ Tarjimada xatolik bo'ldi. Asl matningiz saqlandi. Yozuv uslubini tanlang:",
                 reply_markup=mode_inline_keyboard()
             )
     else:
@@ -479,7 +500,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_info = user_data_store.get(user_id)
         raw_text = user_info['text']
         
-        # Xatosiz va xavfsiz tozalash: barcha harflar, raqamlar, tinish belgilari va yangi qatorlar saqlanadi
         clean_text = re.sub(
             r'[^a-zA-Z0-9\s.,!?\"\'\-\—:;()№%@«»а-яА-ЯёЁo‘O‘g‘G‘o’O’g’G’]',
             '',
@@ -492,10 +512,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         img_w, img_h = base_img.size
         draw_dummy = ImageDraw.Draw(base_img)
 
-        margin_left = 118 if mode == 'text' else 180
-        margin_right = 180
-        margin_top = 180
-        margin_bottom = 120
+        # MARGINLAR VA CHEKLAR TALABA DAFTARIGA MOSLASHTIRILDI (TEPADAN BOSHLANADI)
+        margin_left = 90 if mode == 'text' else 140
+        margin_right = 90
+        margin_top = 100
+        margin_bottom = 80
 
         usable_width = img_w - margin_left - margin_right
         usable_height = img_h - margin_top - margin_bottom
@@ -504,18 +525,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         font = ImageFont.truetype(font_info['file'], size=font_size)
 
         lines = wrap_text_by_pixels(clean_text, font, usable_width, draw_dummy)
-        line_spacing = int(font_size * 0.35)
+        line_spacing = int(font_size * 0.25)
         line_height = font_size + line_spacing
-        total_height = len(lines) * line_height
-
-        if total_height > usable_height:
-            while total_height > usable_height and font_size > 20:
-                font_size -= 1
-                font = ImageFont.truetype(font_info['file'], size=font_size)
-                lines = wrap_text_by_pixels(clean_text, font, usable_width, draw_dummy)
-                line_spacing = int(font_size * 0.35)
-                line_height = font_size + line_spacing
-                total_height = len(lines) * line_height
 
         max_lines_per_page = max(1, usable_height // line_height)
         pages_lines = [
