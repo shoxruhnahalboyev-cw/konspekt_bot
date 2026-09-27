@@ -147,7 +147,6 @@ FONTS = {
     },
 }
 
-# Foydalanuvchilar matnlarini saqlash
 user_data_store = {}
 
 
@@ -217,7 +216,7 @@ def sub_keyboard():
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
         [
-            [KeyboardButton('✍️ Yangi konspekt yaratish')],
+            [KeyboardButton('✍️ Yangi matn yuborish')],
             [KeyboardButton('ℹ️ Bot haqida'), KeyboardButton('❓ Yordam')],
         ],
         resize_keyboard=True,
@@ -282,11 +281,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # User ma'lumotlarini o'chiramiz
     user_data_store[user.id] = {}
 
     await update.message.reply_text(
-        "Salom! Konspekt qilish uchun **matningizni yuboring**:",
+        "Salom! Konspekt yaratish uchun **matningizni yuboring**:",
         reply_markup=main_menu_keyboard(),
     )
 
@@ -320,14 +318,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    text = update.message.text
+    text = update.message.text.strip()
 
-    if text == '✍️ Yangi konspekt yaratish':
-        # ESKI MATNNI TO'LIQ O'CHIRAMIZ!
-        user_data_store[user.id] = {}
+    # MENYU TUGMALARINI TEKSHIRISH
+    if text == '✍️ Yangi matn yuborish' or text == 'Yangi matn yuborish':
+        user_data_store[user.id] = {}  # ESKI MATNNI MUTLAQO O'CHIRAMIZ
         await update.message.reply_text(
-            '📥 **Yangi konspekt uchun matningizni yuboring:**',
-            parse_mode='Markdown'
+            '📥 **Konspekt qilish uchun yangi matningizni yuboring:**',
+            parse_mode='Markdown',
+            reply_markup=main_menu_keyboard()
         )
         return
     elif text == 'ℹ️ Bot haqida':
@@ -344,7 +343,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Yangi kelgan matnni saqlaymiz
+    # AGAR ODDY MATN KELSA
     user_data_store[user.id] = {'text': text}
     
     await update.message.reply_text(
@@ -374,7 +373,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # MATN MAVJUDLIGINI STRICT TEKSHIRISH
     user_info = user_data_store.get(user_id, {})
     if 'text' not in user_info or not user_info['text']:
         await query.message.reply_text(
@@ -408,7 +406,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         raw_text = user_info['text']
         
-        # Tozalash
         clean_text = re.sub(
             r'[^a-zA-Z0-9\s.,!?\"\'\-\—:;()№%@«»а-яА-ЯёЁo‘O‘g‘G‘o’O’g’G’]',
             '',
@@ -421,7 +418,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         img_w, img_h = base_img.size
         draw_dummy = ImageDraw.Draw(base_img)
 
-        # DAFTAR MARGINLARI
+        # MARGINLAR
         margin_left = 90 if mode == 'text' else 150
         margin_right = 80
         margin_top = 80
