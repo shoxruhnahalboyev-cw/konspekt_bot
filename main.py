@@ -24,7 +24,6 @@ import io
 import os
 import re
 import sqlite3
-from datetime import datetime
 from threading import Thread
 
 from flask import Flask
@@ -148,6 +147,7 @@ FONTS = {
     },
 }
 
+# Foydalanuvchilar matnlarini saqlash
 user_data_store = {}
 
 
@@ -224,19 +224,12 @@ def main_menu_keyboard():
     )
 
 
-def action_inline_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📄 Oddiy Konspekt', callback_data='act_konspekt')],
-        [InlineKeyboardButton('📌 Sarlavha va Sana bilan Konspekt', callback_data='act_title_konspekt')],
-    ])
-
-
 def mode_inline_keyboard():
     return InlineKeyboardMarkup([[
         InlineKeyboardButton(
             '📄 Standart Matn (A4)', callback_data='mode_text'
         ),
-        InlineKeyboardButton("📜 She'r / Sheriy tuzilish", callback_data='mode_poem'),
+        InlineKeyboardButton("📜 She'r / Sheriy uslub", callback_data='mode_poem'),
     ]])
 
 
@@ -289,9 +282,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # User ma'lumotlarini o'chiramiz
+    user_data_store[user.id] = {}
+
     await update.message.reply_text(
-        'Salom! Konspekt rejimini tanlang:',
-        reply_markup=action_inline_keyboard(),
+        "Salom! Konspekt qilish uchun **matningizni yuboring**:",
+        reply_markup=main_menu_keyboard(),
     )
 
 
@@ -327,9 +323,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == '✍️ Yangi konspekt yaratish':
+        # ESKI MATNNI TO'LIQ O'CHIRAMIZ!
         user_data_store[user.id] = {}
         await update.message.reply_text(
-            'Kerakli konspekt turini tanlang:', reply_markup=action_inline_keyboard()
+            '📥 **Yangi konspekt uchun matningizni yuboring:**',
+            parse_mode='Markdown'
         )
         return
     elif text == 'ℹ️ Bot haqida':
@@ -341,31 +339,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     elif text == '❓ Yordam':
         await update.message.reply_text(
-            '📌 Avval xizmat turini tanlang, so\'ng matn yuboring.',
+            '📌 Konspekt qilish uchun shunchaki matn yuboring va shriftni tanlang.',
             reply_markup=main_menu_keyboard(),
         )
         return
 
-    user_info = user_data_store.get(user.id, {})
-    state = user_info.get('state')
-
-    if state == 'awaiting_title':
-        user_info['title'] = text
-        user_info['state'] = 'awaiting_text'
-        user_data_store[user.id] = user_info
-        await update.message.reply_text(
-            '✅ Sarlavha qabul qilindi!\n\nEndi konspektning **asosiy matnini** yuboring:'
-        )
-    elif state == 'awaiting_text' or user_info.get('action') == 'konspekt':
-        user_info['text'] = text
-        user_data_store[user.id] = user_info
-        await update.message.reply_text(
-            'Yozuv uslubini tanlang:', reply_markup=mode_inline_keyboard()
-        )
-    else:
-        await update.message.reply_text(
-            'Iltimos, avval kerakli konspekt turini tanlang:', reply_markup=action_inline_keyboard()
-        )
+    # Yangi kelgan matnni saqlaymiz
+    user_data_store[user.id] = {'text': text}
+    
+    await update.message.reply_text(
+        '✅ Matn qabul qilindi!\n\nEndi yozuv uslubini tanlang:',
+        reply_markup=mode_inline_keyboard()
+    )
 
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -389,25 +374,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    if data == 'act_konspekt':
-        user_data_store[user_id] = {'action': 'konspekt', 'state': 'awaiting_text'}
-        await query.edit_message_text(
-            text="📥 **Konspekt uchun matningizni yuboring:**",
-            parse_mode='Markdown'
-        )
-        return
-
-    if data == 'act_title_konspekt':
-        user_data_store[user_id] = {'action': 'title_konspekt', 'state': 'awaiting_title'}
-        await query.edit_message_text(
-            text="📌 **Mavzu sarlavhasini (Mavzu nomini) yuboring:**\n*(Masalan: O'zbekiston Tarixi - 5-Mavzu)*",
-            parse_mode='Markdown'
-        )
-        return
-
-    if user_id not in user_data_store or 'text' not in user_data_store[user_id]:
+    # MATN MAVJUDLIGINI STRICT TEKSHIRISH
+    user_info = user_data_store.get(user_id, {})
+    if 'text' not in user_info or not user_info['text']:
         await query.message.reply_text(
-            'Matn topilmadi. Qaytadan harakatni tanlang.', reply_markup=main_menu_keyboard()
+            '⚠️ Matn topilmadi! Iltimos, avval matn yuboring.', reply_markup=main_menu_keyboard()
         )
         return
 
@@ -435,23 +406,22 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        user_info = user_data_store.get(user_id)
         raw_text = user_info['text']
-        title_text = user_info.get('title', '')
         
+        # Tozalash
         clean_text = re.sub(
             r'[^a-zA-Z0-9\s.,!?\"\'\-\—:;()№%@«»а-яА-ЯёЁo‘O‘g‘G‘o’O’g’G’]',
             '',
             raw_text,
         )
 
-        mode = user_data_store[user_id].get('mode', 'text')
+        mode = user_info.get('mode', 'text')
 
         base_img = Image.open('paper.jpg')
         img_w, img_h = base_img.size
         draw_dummy = ImageDraw.Draw(base_img)
 
-        # TALABA DAFTARI CHEKLARI (Haqiqiy daftar shakli)
+        # DAFTAR MARGINLARI
         margin_left = 90 if mode == 'text' else 150
         margin_right = 80
         margin_top = 80
@@ -474,27 +444,10 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         pages = []
-        today_date = datetime.now().strftime("%d.%m.%Y")
-
-        for page_num, p_lines in enumerate(pages_lines):
+        for p_lines in pages_lines:
             page_img = Image.open('paper.jpg')
             draw = ImageDraw.Draw(page_img)
             y = margin_top
-
-            # FAQAT BIRINCHI SAHIFADA SARLAVHA VA SANA YOZILADI
-            if page_num == 0:
-                # 1. Sana (Yuqori o'ng burchakda)
-                date_font = ImageFont.truetype(font_info['file'], size=int(font_size * 0.75))
-                draw.text((img_w - margin_right - 140, y - 20), today_date, fill=(180, 40, 40), font=date_font)
-
-                # 2. Sarlavha (O'rtada, qizil/to'q ruchka bilan)
-                if title_text:
-                    title_font = ImageFont.truetype(font_info['file'], size=int(font_size * 1.15))
-                    t_bbox = draw.textbbox((0, 0), title_text, font=title_font)
-                    t_w = t_bbox[2] - t_bbox[0]
-                    t_x = (img_w - t_w) // 2
-                    draw.text((t_x, y + 20), title_text, fill=(160, 20, 20), font=title_font)
-                    y += line_height * 2
 
             for line in p_lines:
                 draw.text((margin_left, y), line, fill=(20, 35, 110), font=font)
