@@ -473,8 +473,8 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def setup_bot_commands(app_obj: Application):
     commands = [
-        BotCommand('start', 'Botni qayta ishga tushirish'),
-        BotCommand('help', "Yordam va ko'rsatma"),
+        BotCommand('start', 'Botni ishga tushirish'),
+        BotCommand('help', 'Yordam'),
         BotCommand('stat', 'Statistika (Admin)'),
     ]
     await app_obj.bot.set_my_commands(commands)
