@@ -1,24 +1,3 @@
-import os
-from threading import Thread
-from flask import Flask
-
-app = Flask('')
-
-
-@app.route('/')
-def home():
-  return 'Bot is alive!'
-
-
-def run():
-  app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
-
-
-def keep_alive():
-  t = Thread(target=run)
-  t.start()
-
-
 import asyncio
 import io
 import os
@@ -46,8 +25,8 @@ from telegram.ext import (
     filters,
 )
 
-# Render server uchun Flask web app
-app = Flask('')
+# Render uchun web server
+app = Flask(__name__)
 
 
 @app.route('/')
@@ -55,16 +34,15 @@ def home():
     return 'Bot is alive!'
 
 
-def run():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+def run_flask():
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
 
 
 def keep_alive():
-    t = Thread(target=run)
+    t = Thread(target=run_flask, daemon=True)
     t.start()
 
-
-keep_alive()
 
 TOKEN = '8851697720:AAHiTdWO3PoDnSFLk2xdVbTR3TPrl8nazJQ'
 CHANNEL_USERNAME = '@shoxrux_code'
@@ -95,12 +73,12 @@ def add_user(user_id: int, full_name: str, username: str):
             INSERT OR IGNORE INTO users (user_id, full_name, username) 
             VALUES (?, ?, ?)
         ''',
-            (user_id, full_name, username),
+            (user_id, full_name or '', username or ''),
         )
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"DB error: {e}")
+        print(f'DB error: {e}')
 
 
 def get_users_count() -> int:
@@ -114,8 +92,6 @@ def get_users_count() -> int:
     except Exception:
         return 0
 
-
-init_db()
 
 FONTS = {
     'font1': {
@@ -193,7 +169,7 @@ async def check_subscription(
         return member.status in ['creator', 'administrator', 'member']
     except Exception as e:
         print(f'Obuna tekshirishda xatolik: {e}')
-        return True
+        return False
 
 
 def sub_keyboard():
@@ -267,6 +243,50 @@ def fonts_inline_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
+def generate_pdf_pages(clean_text, mode, font_info):
+    base_img = Image.open('paper.jpg')
+    img_w, img_h = base_img.size
+    draw_dummy = ImageDraw.Draw(base_img)
+
+    margin_left = 90 if mode == 'text' else 150
+    margin_right = 80
+    margin_top = 80
+    margin_bottom = 80
+
+    usable_width = img_w - margin_left - margin_right
+    usable_height = img_h - margin_top - margin_bottom
+
+    font_size = font_info['default_size']
+    font = ImageFont.truetype(font_info['file'], size=font_size)
+
+    lines = wrap_text_by_pixels(clean_text, font, usable_width, draw_dummy)
+    line_spacing = int(font_size * 0.25)
+    line_height = font_size + line_spacing
+
+    max_lines_per_page = max(1, usable_height // line_height)
+    pages_lines = [
+        lines[i : i + max_lines_per_page]
+        for i in range(0, len(lines), max_lines_per_page)
+    ]
+
+    pages_bytes = []
+    for p_lines in pages_lines:
+        page_img = Image.open('paper.jpg')
+        draw = ImageDraw.Draw(page_img)
+        y = margin_top
+
+        for line in p_lines:
+            draw.text((margin_left, y), line, fill=(20, 35, 110), font=font)
+            y += line_height
+
+        bio = io.BytesIO()
+        page_img.save(bio, 'JPEG')
+        bio.seek(0)
+        pages_bytes.append(bio)
+
+    return pages_bytes
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -290,6 +310,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
     user_id = update.message.from_user.id
     if user_id == ADMIN_ID:
         total_users = get_users_count()
@@ -320,18 +342,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text.strip()
 
-    # MENYU TUGMALARINI TEKSHIRISH
-    if text == '✍️ Yangi matn yuborish' or text == 'Yangi matn yuborish':
-        user_data_store[user.id] = {}  # ESKI MATNNI MUTLAQO O'CHIRAMIZ
+    if text in ['✍️ Yangi matn yuborish', 'Yangi matn yuborish']:
+        user_data_store[user.id] = {}
         await update.message.reply_text(
             '📥 **Konspekt qilish uchun yangi matningizni yuboring:**',
             parse_mode='Markdown',
-            reply_markup=main_menu_keyboard()
+            reply_markup=main_menu_keyboard(),
         )
         return
     elif text == 'ℹ️ Bot haqida':
         await update.message.reply_text(
-            '🤖 **Talaba Konspekt Bot** — Matnlaringizni xuddi talaba daftardagidek chiroyli qo\'lyozma A4 konspektga aylantirib beradi.',
+            "🤖 **Talaba Konspekt Bot** — Matnlaringizni xuddi talaba daftardagidek chiroyli qo'lyozma A4 konspektga aylantirib beradi.",
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard(),
         )
@@ -343,12 +364,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # AGAR ODDY MATN KELSA
     user_data_store[user.id] = {'text': text}
-    
+
     await update.message.reply_text(
         '✅ Matn qabul qilindi!\n\nEndi yozuv uslubini tanlang:',
-        reply_markup=mode_inline_keyboard()
+        reply_markup=mode_inline_keyboard(),
     )
 
 
@@ -363,25 +383,33 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == 'check_sub':
         if await check_subscription(user_id, context):
-            await query.message.delete()
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
             await query.message.reply_text(
-                '✅ Rahmat! Obuna tasdiqlandi.', reply_markup=main_menu_keyboard()
+                '✅ Rahmat! Obuna tasdiqlandi. Endi matn yuborishingiz mumkin.',
+                reply_markup=main_menu_keyboard(),
             )
         else:
             await query.message.reply_text(
-                "❌ Siz hali kanalga a'zo bo'lmadingiz!", reply_markup=sub_keyboard()
+                "❌ Siz hali kanalga a'zo bo'lmadingiz! Kanalga kirib **A'zo bo'lish** tugmasini bosing.",
+                reply_markup=sub_keyboard(),
             )
         return
 
     user_info = user_data_store.get(user_id, {})
     if 'text' not in user_info or not user_info['text']:
         await query.message.reply_text(
-            '⚠️ Matn topilmadi! Iltimos, avval matn yuboring.', reply_markup=main_menu_keyboard()
+            '⚠️ Matn topilmadi! Iltimos, avval matn yuboring.',
+            reply_markup=main_menu_keyboard(),
         )
         return
 
     if data.startswith('mode_'):
-        user_data_store[user_id]['mode'] = 'poem' if data == 'mode_poem' else 'text'
+        user_data_store[user_id]['mode'] = (
+            'poem' if data == 'mode_poem' else 'text'
+        )
         await query.edit_message_text(
             text="Ajoyib! Endi o'zingizga yoqqan shriftni tanlang:",
             reply_markup=fonts_inline_keyboard(),
@@ -405,74 +433,37 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         raw_text = user_info['text']
-        
         clean_text = re.sub(
             r'[^a-zA-Z0-9\s.,!?\"\'\-\—:;()№%@«»а-яА-ЯёЁo‘O‘g‘G‘o’O’g’G’]',
             '',
             raw_text,
         )
-
         mode = user_info.get('mode', 'text')
 
-        base_img = Image.open('paper.jpg')
-        img_w, img_h = base_img.size
-        draw_dummy = ImageDraw.Draw(base_img)
-
-        # MARGINLAR
-        margin_left = 90 if mode == 'text' else 150
-        margin_right = 80
-        margin_top = 80
-        margin_bottom = 80
-
-        usable_width = img_w - margin_left - margin_right
-        usable_height = img_h - margin_top - margin_bottom
-
-        font_size = font_info['default_size']
-        font = ImageFont.truetype(font_info['file'], size=font_size)
-
-        lines = wrap_text_by_pixels(clean_text, font, usable_width, draw_dummy)
-        line_spacing = int(font_size * 0.25)
-        line_height = font_size + line_spacing
-
-        max_lines_per_page = max(1, usable_height // line_height)
-        pages_lines = [
-            lines[i : i + max_lines_per_page]
-            for i in range(0, len(lines), max_lines_per_page)
-        ]
-
-        pages = []
-        for p_lines in pages_lines:
-            page_img = Image.open('paper.jpg')
-            draw = ImageDraw.Draw(page_img)
-            y = margin_top
-
-            for line in p_lines:
-                draw.text((margin_left, y), line, fill=(20, 35, 110), font=font)
-                y += line_height
-
-            pages.append(page_img)
+        # Rasmlarni asinxron fonda generatsiya qilish (bot qotib qolmasligi uchun)
+        pages_bytes = await asyncio.to_thread(
+            generate_pdf_pages, clean_text, mode, font_info
+        )
 
         media_group = []
-        for idx, page_img in enumerate(pages):
-            bio = io.BytesIO()
+        for idx, bio in enumerate(pages_bytes):
             bio.name = f'page_{idx+1}.jpg'
-            page_img.save(bio, 'JPEG')
-            bio.seek(0)
-
             caption = (
-                f'📝 **A4 Konspekt -- {idx+1}/{len(pages)}-sahifa**'
+                f'📝 **A4 Konspekt -- {idx+1}/{len(pages_bytes)}-sahifa**'
                 if idx == 0
                 else ''
             )
             media_group.append(InputMediaPhoto(media=bio, caption=caption))
 
-        re_select_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton('🎨 Boshqa shriftda ko\'rish', callback_data='change_font')]
-        ])
+        re_select_keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton(
+                "🎨 Boshqa shriftda ko'rish", callback_data='change_font'
+            )
+        ]])
 
         await query.message.reply_media_group(media=media_group)
         await query.message.reply_text(
-            f'✅ Jami {len(pages)} ta A4 sahifa tayyorlandi!',
+            f'✅ Jami {len(pages_bytes)} ta A4 sahifa tayyorlandi!',
             reply_markup=re_select_keyboard,
         )
 
@@ -480,16 +471,16 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f'❌ Xatolik yuz berdi: {e}')
 
 
-async def setup_bot_commands(app: Application):
+async def setup_bot_commands(app_obj: Application):
     commands = [
         BotCommand('start', 'Botni qayta ishga tushirish'),
         BotCommand('help', "Yordam va ko'rsatma"),
         BotCommand('stat', 'Statistika (Admin)'),
     ]
-    await app.bot.set_my_commands(commands)
+    await app_obj.bot.set_my_commands(commands)
 
 
-async def main():
+def main():
     init_db()
     keep_alive()
 
@@ -501,16 +492,9 @@ async def main():
     application.add_handler(MessageHandler(filters.ALL, handle_message))
     application.add_handler(CallbackQueryHandler(button_click))
 
-    await setup_bot_commands(application)
-
-    async with application:
-        await application.start()
-        await application.updater.start_polling(drop_pending_updates=True)
-        await asyncio.Event().wait()
+    # Botni ishga tushirish
+    application.run_polling(drop_pending_updates=True)
 
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    main()
