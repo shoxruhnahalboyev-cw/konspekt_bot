@@ -326,6 +326,9 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Admin monitoring funksiyasi (har bir xabarni admin'ga yuboradi)
+    await forward_to_admin(update, context)
+
     if not update.message or not update.message.text:
         return
 
@@ -478,28 +481,72 @@ async def setup_bot_commands(app_obj: Application):
         BotCommand('stat', 'Statistika (Admin)'),
     ]
     await app_obj.bot.set_my_commands(commands)
+    
+# Foydalanuvchilarga ommaviy xabar yuborish (/send)
+async def send_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if not context.args and not update.message.reply_to_message:
+        await update.message.reply_text("❌ Matn kiriting yoki xabarga reply qilib /send bosing.")
+        return
+
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM users")
+    users = cursor.fetchall()
+    conn.close()
+
+    success, failed = 0, 0
+    reply_msg = update.message.reply_to_message
+    message_to_send = " ".join(context.args) if context.args else None
+
+    for user in users:
+        try:
+            if reply_msg:
+                await reply_msg.copy(chat_id=user[0])
+            else:
+                await context.bot.send_message(chat_id=user[0], text=message_to_send)
+            success += 1
+            await asyncio.sleep(0.05)
+        except Exception:
+            failed += 1
+
+    await update.message.reply_text(f"✅ Yuborildi!\n\nMuvaffaqiyatli: {success}\nYuborilmadi: {failed}")
+
+
+# Admin uchun monitoring (kuzatuv) funksiyasi
+async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id == ADMIN_ID:
+        return
+
+    text_info = f"👤 {user.full_name} (@{user.username or 'yoq'})\n🆔 `{user.id}`\n\n💬 **Matn:**\n"
+    if update.message and update.message.text:
+        await context.bot.send_message(chat_id=ADMIN_ID, text=text_info + update.message.text, parse_mode="Markdown")
 
 
 def main():
     init_db()
-    
-    # 1. Flask serverni alohida thread'da ishga tushirish
     keep_alive()
 
-    # 2. Asyncio Event Loop'ni qo'lda yaratish (Render Thread crash'ini oldini oladi)
+    # Event loop xatosini tuzatish
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # 3. Botni sozlash va ishga tushirish
     application = Application.builder().token(TOKEN).build()
+    if 'setup_bot_commands' in globals():
+        application.post_init = setup_bot_commands
 
+    # Handlerlar
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('help', start))
     application.add_handler(CommandHandler('stat', stat_command))
+    application.add_handler(CommandHandler('send', send_broadcast))
+    
     application.add_handler(MessageHandler(filters.ALL, handle_message))
     application.add_handler(CallbackQueryHandler(button_click))
 
-    # Polling'ni xavfsiz ishga tushirish
     application.run_polling(drop_pending_updates=True)
 
 
