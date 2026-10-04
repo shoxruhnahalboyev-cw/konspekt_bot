@@ -482,8 +482,15 @@ async def setup_bot_commands(app_obj: Application):
 
 def main():
     init_db()
+    
+    # 1. Flask serverni alohida thread'da ishga tushirish
     keep_alive()
 
+    # 2. Asyncio Event Loop'ni qo'lda yaratish (Render Thread crash'ini oldini oladi)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # 3. Botni sozlash va ishga tushirish
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler('start', start))
@@ -492,7 +499,7 @@ def main():
     application.add_handler(MessageHandler(filters.ALL, handle_message))
     application.add_handler(CallbackQueryHandler(button_click))
 
-    # Botni ishga tushirish
+    # Polling'ni xavfsiz ishga tushirish
     application.run_polling(drop_pending_updates=True)
 
 
