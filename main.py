@@ -475,6 +475,9 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 import sqlite3
+import asyncio
+from telegram import Update, BotCommand, Application
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 # --- 1. BAN VA BAZA FUNKSIYALARI ---
 def init_banned_db():
@@ -600,13 +603,13 @@ async def send_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Yuborildi!\n\nMuvaffaqiyatli: {success}\nYuborilmadi: {failed}")
 
 
-# Admin uchun monitoring (kuzatuv) funksiyasi
+# --- 3. ADMIN MONITIRING FUNKSIYASI ---
 async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id == ADMIN_ID:
         return
 
-    # Ban qilinganlarning xabari adminga ham kelmaydi
+    # Ban qilinganlarning xabari adminga kelmaydi
     if is_banned(user.id):
         return
 
@@ -615,6 +618,23 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_ID, text=text_info + update.message.text, parse_mode="Markdown")
 
 
+# --- 4. XABARLARNI QABUL QILISH (HANDLE_MESSAGE) ---
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not user:
+        return
+
+    # 1. Ban qilinganlarni to'xtatish
+    if is_banned(user.id):
+        return
+
+    # 2. Xabarni adminga yetkazish (ID va Username bilan birga)
+    await forward_to_admin(update, context)
+
+    # --- (Bu yerdan keyin sizning botingizning boshqa amallari/konspekt qilish logikasi davom etadi) ---
+
+
+# --- 5. MAIN FUNKSIYASI ---
 def main():
     init_db()
     init_banned_db()
@@ -634,7 +654,7 @@ def main():
     application.add_handler(CommandHandler('stat', stat_command))
     application.add_handler(CommandHandler('send', send_broadcast))
     
-    # Ban, Unban va Reply komandalari qo'shildi
+    # Ban, Unban va Reply komandalari
     application.add_handler(CommandHandler('ban', ban_command))
     application.add_handler(CommandHandler('unban', unban_command))
     application.add_handler(CommandHandler('reply', reply_command))
