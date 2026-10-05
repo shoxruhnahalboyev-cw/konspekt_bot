@@ -474,6 +474,91 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f'❌ Xatolik yuz berdi: {e}')
 
 
+import sqlite3
+
+# --- 1. BAN VA BAZA FUNKSIYALARI ---
+def init_banned_db():
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS banned_users (user_id INTEGER PRIMARY KEY)')
+    conn.commit()
+    conn.close()
+
+def is_banned(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id FROM banned_users WHERE user_id = ?', (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+def ban_user_db(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO banned_users (user_id) VALUES (?)', (user_id,))
+    conn.commit()
+    conn.close()
+
+def unban_user_db(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM banned_users WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+
+# --- 2. ADMIN KOMANDALARI (/ban, /unban, /reply) ---
+async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if not context.args:
+        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/ban USER_ID`", parse_mode='Markdown')
+        return
+
+    try:
+        target_id = int(context.args[0])
+        ban_user_db(target_id)
+        await update.message.reply_text(f"🚫 Foydalanuvchi `{target_id}` muvaffaqiyatli ban qilindi!", parse_mode='Markdown')
+    except ValueError:
+        await update.message.reply_text("❌ USER_ID raqam bo'lishi kerak!")
+
+async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if not context.args:
+        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/unban USER_ID`", parse_mode='Markdown')
+        return
+
+    try:
+        target_id = int(context.args[0])
+        unban_user_db(target_id)
+        await update.message.reply_text(f"✅ Foydalanuvchi `{target_id}` bandan chiqarildi!", parse_mode='Markdown')
+    except ValueError:
+        await update.message.reply_text("❌ USER_ID raqam bo'lishi kerak!")
+
+async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    if len(context.args) < 2:
+        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/reply USER_ID Matn`", parse_mode='Markdown')
+        return
+
+    try:
+        target_id = int(context.args[0])
+        text_to_send = " ".join(context.args[1:])
+        
+        await context.bot.send_message(chat_id=target_id, text=f"💬 **Admin javobi:**\n\n{text_to_send}", parse_mode='Markdown')
+        await update.message.reply_text(f"✅ Javob `{target_id}` id'li foydalanuvchiga yuborildi!", parse_mode='Markdown')
+    except Exception as e:
+        await update.message.reply_text(f"❌ Xabar yuborishda xatolik: {e}")
+
+
 async def setup_bot_commands(app_obj: Application):
     commands = [
         BotCommand('start', 'Botni ishga tushirish'),
@@ -521,6 +606,10 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user.id == ADMIN_ID:
         return
 
+    # Ban qilinganlarning xabari adminga ham kelmaydi
+    if is_banned(user.id):
+        return
+
     text_info = f"👤 {user.full_name} (@{user.username or 'yoq'})\n🆔 `{user.id}`\n\n💬 **Matn:**\n"
     if update.message and update.message.text:
         await context.bot.send_message(chat_id=ADMIN_ID, text=text_info + update.message.text, parse_mode="Markdown")
@@ -528,6 +617,7 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     init_db()
+    init_banned_db()
     keep_alive()
 
     # Event loop xatosini tuzatish
@@ -538,11 +628,16 @@ def main():
     if 'setup_bot_commands' in globals():
         application.post_init = setup_bot_commands
 
-    # Handlerlar
+    # Handlerlar (Barcha komandalar shu yerda ro'yxatdan o'tadi)
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('help', start))
     application.add_handler(CommandHandler('stat', stat_command))
     application.add_handler(CommandHandler('send', send_broadcast))
+    
+    # Ban, Unban va Reply komandalari qo'shildi
+    application.add_handler(CommandHandler('ban', ban_command))
+    application.add_handler(CommandHandler('unban', unban_command))
+    application.add_handler(CommandHandler('reply', reply_command))
     
     application.add_handler(MessageHandler(filters.ALL, handle_message))
     application.add_handler(CallbackQueryHandler(button_click))
