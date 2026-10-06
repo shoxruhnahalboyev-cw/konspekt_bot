@@ -476,8 +476,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 import sqlite3
 import asyncio
-from telegram import Update, BotCommand, Application
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+
+# --- SOZLAMALAR ---
+CHANNEL_USERNAME = "@sizning_kanal_username"  # <-- O'z kanalingiz username'ini yozing!
 
 # --- 1. BAN VA BAZA FUNKSIYALARI ---
 def init_banned_db():
@@ -513,7 +516,40 @@ def unban_user_db(user_id):
     conn.close()
 
 
-# --- 2. ADMIN KOMANDALARI (/ban, /unban, /reply) ---
+# --- 2. MAJBURIY OBUNA (FORCE SUBSCRIBE) TEKSHIRUVİ ---
+async def check_user_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if ADMIN_ID and user_id == ADMIN_ID:
+        return True
+    try:
+        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
+        # Agar a'zo bo'lsa yoki admin/creator bo'lsa
+        if member.status in ['member', 'administrator', 'creator']:
+            return True
+    except Exception:
+        pass
+    return False
+
+async def send_subscription_warning(update: Update):
+    keyboard = [
+        [InlineKeyboardButton("📢 Kanalga obuna bo'lish", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")],
+        [InlineKeyboardButton("🔄 Obunani tekshirish", callback_data="check_sub")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = (
+        "❌ **Botdan foydalanish uchun avval quyidagi kanalimizga obuna bo'lishingiz kerak!**\n\n"
+        f"Kanalga a'zo bo'lgach, **'🔄 Obunani tekshirish'** tugmasini bosing."
+    )
+    if update.callback_query:
+        await update.callback_query.answer("Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
+        try:
+            await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+        except Exception:
+            pass
+    elif update.message:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+
+
+# --- 3. ADMIN KOMANDALARI (/ban, /unban, /reply) ---
 async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
@@ -603,13 +639,12 @@ async def send_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Yuborildi!\n\nMuvaffaqiyatli: {success}\nYuborilmadi: {failed}")
 
 
-# --- 3. ADMIN MONITIRING FUNKSIYASI ---
+# --- 4. ADMIN MONITORING FUNKSIYASI ---
 async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if user.id == ADMIN_ID:
+    if not user or user.id == ADMIN_ID:
         return
 
-    # Ban qilinganlarning xabari adminga kelmaydi
     if is_banned(user.id):
         return
 
@@ -618,23 +653,52 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_ID, text=text_info + update.message.text, parse_mode="Markdown")
 
 
-# --- 4. XABARLARNI QABUL QILISH (HANDLE_MESSAGE) ---
+# --- 5. XABARLARNI QABUL QILISH (HANDLE_MESSAGE) ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not user:
         return
 
-    # 1. Ban qilinganlarni to'xtatish
+    # 1. Ban tekshiruvi
     if is_banned(user.id):
         return
 
-    # 2. Xabarni adminga yetkazish (ID va Username bilan birga)
+    # 2. Kanalga obuna bo'lganini tekshirish
+    is_subscribed = await check_user_subscription(user.id, context)
+    if not is_subscribed:
+        await send_subscription_warning(update)
+        return
+
+    # 3. Adminga xabarni yetkazish (Monitoring)
     await forward_to_admin(update, context)
 
-    # --- (Bu yerdan keyin sizning botingizning boshqa amallari/konspekt qilish logikasi davom etadi) ---
+    # --- (Bu yerdan keyin botingizning asosiy konspekt qilish funksiyalari ishlaydi) ---
 
 
-# --- 5. MAIN FUNKSIYASI ---
+# --- 6. CALLBACK (TUGMA BOSILgANDA) ---
+async def enhanced_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user = query.from_user
+
+    if query.data == "check_sub":
+        is_subscribed = await check_user_subscription(user.id, context)
+        if is_subscribed:
+            await query.answer("Rahmat! Obunangiz tasdiqlandi 🎉", show_alert=True)
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
+            await query.message.reply_text("✅ Obuna tasdiqlandi! Endi botdan to'liq foydalanishingiz mumkin. Matningizni yuboring:")
+        else:
+            await query.answer("❌ Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
+        return
+
+    # Agar boshqa eski tugmalar bo'lsa, ularni chaqiramiz
+    if 'button_click' in globals() and button_click != enhanced_button_click:
+        await button_click(update, context)
+
+
+# --- 7. MAIN FUNKSIYASI ---
 def main():
     init_db()
     init_banned_db()
@@ -648,7 +712,7 @@ def main():
     if 'setup_bot_commands' in globals():
         application.post_init = setup_bot_commands
 
-    # Handlerlar (Barcha komandalar shu yerda ro'yxatdan o'tadi)
+    # Handlerlar
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('help', start))
     application.add_handler(CommandHandler('stat', stat_command))
@@ -660,7 +724,7 @@ def main():
     application.add_handler(CommandHandler('reply', reply_command))
     
     application.add_handler(MessageHandler(filters.ALL, handle_message))
-    application.add_handler(CallbackQueryHandler(button_click))
+    application.add_handler(CallbackQueryHandler(enhanced_button_click))
 
     application.run_polling(drop_pending_updates=True)
 
