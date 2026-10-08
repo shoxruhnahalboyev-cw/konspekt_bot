@@ -480,7 +480,7 @@ from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMar
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 # --- SOZLAMALAR ---
-CHANNEL_USERNAME = "@sizning_kanal_username"  # <-- O'z kanalingiz username'ini yozing!
+CHANNEL_USERNAME = "@shoxrux_code"  # Kanalingiz username'i tasdiqlandi[cite: 4]
 
 # --- 1. BAN VA BAZA FUNKSIYALARI ---
 def init_banned_db():
@@ -516,13 +516,12 @@ def unban_user_db(user_id):
     conn.close()
 
 
-# --- 2. MAJBURIY OBUNA (FORCE SUBSCRIBE) TEKSHIRUVİ ---
+# --- 2. MAJBURIY OBUNA (FORCE SUBSCRIBE) TEKSHIRUVI ---
 async def check_user_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if ADMIN_ID and user_id == ADMIN_ID:
         return True
     try:
         member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        # Agar a'zo bo'lsa yoki admin/creator bo'lsa
         if member.status in ['member', 'administrator', 'creator']:
             return True
     except Exception:
@@ -663,16 +662,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_banned(user.id):
         return
 
-    # 2. Kanalga obuna bo'lganini tekshirish
+    # 2. Kanalga obuna tekshiruvi
     is_subscribed = await check_user_subscription(user.id, context)
     if not is_subscribed:
         await send_subscription_warning(update)
         return
 
-    # 3. Adminga xabarni yetkazish (Monitoring)
+    # 3. Adminga monitoring orqali yetkazish (ID va Username)
     await forward_to_admin(update, context)
 
-    # --- (Bu yerdan keyin botingizning asosiy konspekt qilish funksiyalari ishlaydi) ---
+    # --- (Bu yerdan keyin botingizning asosiy konspekt qilish funksiyalari davom etadi) ---
 
 
 # --- 6. CALLBACK (TUGMA BOSILgANDA) ---
@@ -693,7 +692,6 @@ async def enhanced_button_click(update: Update, context: ContextTypes.DEFAULT_TY
             await query.answer("❌ Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
         return
 
-    # Agar boshqa eski tugmalar bo'lsa, ularni chaqiramiz
     if 'button_click' in globals() and button_click != enhanced_button_click:
         await button_click(update, context)
 
@@ -704,7 +702,6 @@ def main():
     init_banned_db()
     keep_alive()
 
-    # Event loop xatosini tuzatish
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -712,13 +709,11 @@ def main():
     if 'setup_bot_commands' in globals():
         application.post_init = setup_bot_commands
 
-    # Handlerlar
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('help', start))
     application.add_handler(CommandHandler('stat', stat_command))
     application.add_handler(CommandHandler('send', send_broadcast))
     
-    # Ban, Unban va Reply komandalari
     application.add_handler(CommandHandler('ban', ban_command))
     application.add_handler(CommandHandler('unban', unban_command))
     application.add_handler(CommandHandler('reply', reply_command))
