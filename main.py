@@ -485,18 +485,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         return
 
-    if user.id == ADMIN_ID:
-        return
+    # Agar foydalanuvchi admin bo'lmasa, ban va obunani tekshiramiz
+    if user.id != ADMIN_ID:
+        if is_banned(user.id):
+            return
 
-    if is_banned(user.id):
-        return
+        is_subscribed = await check_subscription(user.id, context)
+        if not is_subscribed:
+            await send_subscription_warning(update)
+            return
 
-    is_subscribed = await check_subscription(user.id, context)
-    if not is_subscribed:
-        await send_subscription_warning(update)
-        return
-
-    await forward_to_admin(update, context)
+        # Oddiy foydalanuvchilar xabarini adminga yo'naltiramiz
+        await forward_to_admin(update, context)
 
     if not update.message or not update.message.text:
         return
