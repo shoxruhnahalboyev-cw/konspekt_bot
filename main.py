@@ -162,6 +162,8 @@ def wrap_text_by_pixels(text, font, max_width, draw):
 async def check_subscription(
     user_id: int, context: ContextTypes.DEFAULT_TYPE
 ) -> bool:
+    if ADMIN_ID and user_id == ADMIN_ID:
+        return True
     try:
         member = await context.bot.get_chat_member(
             chat_id=CHANNEL_USERNAME, user_id=user_id
@@ -325,23 +327,181 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+# --- BAN BAZASI VA FUNKSIYALARI ---
+def init_banned_db():
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS banned_users (user_id INTEGER PRIMARY KEY)')
+    conn.commit()
+    conn.close()
+
+def is_banned(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id FROM banned_users WHERE user_id = ?', (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+def ban_user_db(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO banned_users (user_id) VALUES (?)', (user_id,))
+    conn.commit()
+    conn.close()
+
+def unban_user_db(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM banned_users WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+
+async def send_subscription_warning(update: Update):
+    keyboard = [
+        [InlineKeyboardButton("📢 Kanalga obuna bo'lish", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")],
+        [InlineKeyboardButton("🔄 Obunani tekshirish", callback_data="check_sub")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = (
+        "❌ **Botdan foydalanish uchun avval quyidagi kanalimizga obuna bo'lishingiz kerak!**\n\n"
+        f"Kanalga a'zo bo'lgach, **'🔄 Obunani tekshirish'** tugmasini bosing."
+    )
+    if update.callback_query:
+        try:
+            await update.callback_query.answer("Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
+            await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+        except Exception:
+            pass
+    elif update.message:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+
+
+# --- ADMIN KOMANDALARI (/ban, /unban, /reply) ---
+async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/ban USER_ID`", parse_mode='Markdown')
+        return
+    try:
+        target_id = int(context.args[0])
+        ban_user_db(target_id)
+        await update.message.reply_text(f"🚫 Foydalanuvchi `{target_id}` muvaffaqiyatli ban qilindi!", parse_mode='Markdown')
+    except ValueError:
+        await update.message.reply_text("❌ USER_ID raqam bo'lishi kerak!")
+
+
+async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/unban USER_ID`", parse_mode='Markdown')
+        return
+    try:
+        target_id = int(context.args[0])
+        unban_user_db(target_id)
+        await update.message.reply_text(f"✅ Foydalanuvchi `{target_id}` bandan chiqarildi!", parse_mode='Markdown')
+    except ValueError:
+        await update.message.reply_text("❌ USER_ID raqam bo'lishi kerak!")
+
+
+async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    if len(context.args) < 2:
+        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/reply USER_ID Matn`", parse_mode='Markdown')
+        return
+    try:
+        target_id = int(context.args[0])
+        text_to_send = " ".join(context.args[1:])
+        await context.bot.send_message(chat_id=target_id, text=f"💬 **Admin javobi:**\n\n{text_to_send}", parse_mode='Markdown')
+        await update.message.reply_text(f"✅ Javob `{target_id}` id'li foydalanuvchiga yuborildi!", parse_mode='Markdown')
+    except Exception as e:
+        await update.message.reply_text(f"❌ Xabar yuborishda xatolik: {e}")
+
+
+async def setup_bot_commands(app_obj: Application):
+    commands = [
+        BotCommand('start', 'Botni ishga tushirish'),
+        BotCommand('help', 'Yordam'),
+        BotCommand('stat', 'Statistika (Admin)'),
+    ]
+    await app_obj.bot.set_my_commands(commands)
+
+
+# --- OMMAVIY XABAR YUBORISH (/send) ---
+async def send_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    if not context.args and not update.message.reply_to_message:
+        await update.message.reply_text("❌ Matn kiriting yoki xabarga reply qilib /send bosing.")
+        return
+
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM users")
+    users = cursor.fetchall()
+    conn.close()
+
+    success, failed = 0, 0
+    reply_msg = update.message.reply_to_message
+    message_to_send = " ".join(context.args) if context.args else None
+
+    for user in users:
+        try:
+            if reply_msg:
+                await reply_msg.copy(chat_id=user[0])
+            else:
+                await context.bot.send_message(chat_id=user[0], text=message_to_send)
+            success += 1
+            await asyncio.sleep(0.05)
+        except Exception:
+            failed += 1
+
+    await update.message.reply_text(f"✅ Yuborildi!\n\nMuvaffaqiyatli: {success}\nYuborilmadi: {failed}")
+
+
+# --- ADMIN MONITORING FUNKSIYASI ---
+async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not user or user.id == ADMIN_ID:
+        return
+    if is_banned(user.id):
+        return
+
+    text_info = f"👤 {user.full_name} (@{user.username or 'yoq'})\n🆔 `{user.id}`\n\n💬 **Matn:**\n"
+    if update.message and update.message.text:
+        await context.bot.send_message(chat_id=ADMIN_ID, text=text_info + update.message.text, parse_mode="Markdown")
+
+
+# --- XABARLARNI QABUL QILISH (HANDLE_MESSAGE) ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Admin monitoring funksiyasi (har bir xabarni admin'ga yuboradi)
+    user = update.effective_user
+    if not user:
+        return
+
+    if user.id == ADMIN_ID:
+        return
+
+    if is_banned(user.id):
+        return
+
+    is_subscribed = await check_subscription(user.id, context)
+    if not is_subscribed:
+        await send_subscription_warning(update)
+        return
+
     await forward_to_admin(update, context)
 
     if not update.message or not update.message.text:
         return
 
-    user = update.message.from_user
     add_user(user.id, user.full_name, user.username)
-
-    if not await check_subscription(user.id, context):
-        await update.message.reply_text(
-            f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**",
-            parse_mode='Markdown',
-            reply_markup=sub_keyboard(),
-        )
-        return
 
     text = update.message.text.strip()
 
@@ -375,31 +535,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- TUGMALAR BILAN ISHLASH (CALLBACK) ---
+async def enhanced_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query:
         return
 
-    await query.answer()
-    user_id = query.from_user.id
+    user = query.from_user
     data = query.data
 
     if data == 'check_sub':
-        if await check_subscription(user_id, context):
+        is_subscribed = await check_subscription(user.id, context)
+        if is_subscribed:
+            await query.answer("Rahmat! Obunangiz tasdiqlandi 🎉", show_alert=True)
             try:
                 await query.message.delete()
             except Exception:
                 pass
-            await query.message.reply_text(
-                '✅ Rahmat! Obuna tasdiqlandi. Endi matn yuborishingiz mumkin.',
-                reply_markup=main_menu_keyboard(),
-            )
+            await query.message.reply_text("✅ Obuna tasdiqlandi! Endi botdan to'liq foydalanishingiz mumkin. Matningizni yuboring:")
         else:
-            await query.message.reply_text(
-                "❌ Siz hali kanalga a'zo bo'lmadingiz! Kanalga kirib **A'zo bo'lish** tugmasini bosing.",
-                reply_markup=sub_keyboard(),
-            )
+            await query.answer("❌ Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
         return
+
+    await query.answer()
+    user_id = query.from_user.id
 
     user_info = user_data_store.get(user_id, {})
     if 'text' not in user_info or not user_info['text']:
@@ -443,7 +602,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         mode = user_info.get('mode', 'text')
 
-        # Rasmlarni asinxron fonda generatsiya qilish (bot qotib qolmasligi uchun)
         pages_bytes = await asyncio.to_thread(
             generate_pdf_pages, clean_text, mode, font_info
         )
@@ -474,225 +632,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f'❌ Xatolik yuz berdi: {e}')
 
 
-import sqlite3
-import asyncio
-from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-
-# --- SOZLAMALAR ---
-CHANNEL_USERNAME = "@shoxrux_code"
-
-# --- 1. BAN VA BAZA FUNKSIYALARI ---
-def init_banned_db():
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS banned_users (user_id INTEGER PRIMARY KEY)')
-    conn.commit()
-    conn.close()
-
-def is_banned(user_id):
-    init_banned_db()
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT user_id FROM banned_users WHERE user_id = ?', (user_id,))
-    result = cursor.fetchone()
-    conn.close()
-    return result is not None
-
-def ban_user_db(user_id):
-    init_banned_db()
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('INSERT OR IGNORE INTO banned_users (user_id) VALUES (?)', (user_id,))
-    conn.commit()
-    conn.close()
-
-def unban_user_db(user_id):
-    init_banned_db()
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM banned_users WHERE user_id = ?', (user_id,))
-    conn.commit()
-    conn.close()
-
-
-# --- 2. MAJBURIY OBUNA (FORCE SUBSCRIBE) TEKSHIRUVI ---
-async def check_user_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    if ADMIN_ID and user_id == ADMIN_ID:
-        return True
-    try:
-        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        if member.status in ['member', 'administrator', 'creator']:
-            return True
-    except Exception:
-        pass
-    return False
-
-async def send_subscription_warning(update: Update):
-    keyboard = [
-        [InlineKeyboardButton("📢 Kanalga obuna bo'lish", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")],
-        [InlineKeyboardButton("🔄 Obunani tekshirish", callback_data="check_sub")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    text = (
-        "❌ **Botdan foydalanish uchun avval quyidagi kanalimizga obuna bo'lishingiz kerak!**\n\n"
-        f"Kanalga a'zo bo'lgach, **'🔄 Obunani tekshirish'** tugmasini bosing."
-    )
-    if update.callback_query:
-        try:
-            await update.callback_query.answer("Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
-            await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-        except Exception:
-            pass
-    elif update.message:
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
-
-# --- 3. ADMIN KOMANDALARI (/ban, /unban, /reply) ---
-async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if not context.args:
-        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/ban USER_ID`", parse_mode='Markdown')
-        return
-    try:
-        target_id = int(context.args[0])
-        ban_user_db(target_id)
-        await update.message.reply_text(f"🚫 Foydalanuvchi `{target_id}` muvaffaqiyatli ban qilindi!", parse_mode='Markdown')
-    except ValueError:
-        await update.message.reply_text("❌ USER_ID raqam bo'lishi kerak!")
-
-async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if not context.args:
-        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/unban USER_ID`", parse_mode='Markdown')
-        return
-    try:
-        target_id = int(context.args[0])
-        unban_user_db(target_id)
-        await update.message.reply_text(f"✅ Foydalanuvchi `{target_id}` bandan chiqarildi!", parse_mode='Markdown')
-    except ValueError:
-        await update.message.reply_text("❌ USER_ID raqam bo'lishi kerak!")
-
-async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if len(context.args) < 2:
-        await update.message.reply_text("❌ Noto'g'ri format. Ishlatish: `/reply USER_ID Matn`", parse_mode='Markdown')
-        return
-    try:
-        target_id = int(context.args[0])
-        text_to_send = " ".join(context.args[1:])
-        await context.bot.send_message(chat_id=target_id, text=f"💬 **Admin javobi:**\n\n{text_to_send}", parse_mode='Markdown')
-        await update.message.reply_text(f"✅ Javob `{target_id}` id'li foydalanuvchiga yuborildi!", parse_mode='Markdown')
-    except Exception as e:
-        await update.message.reply_text(f"❌ Xabar yuborishda xatolik: {e}")
-
-
-async def setup_bot_commands(app_obj: Application):
-    commands = [
-        BotCommand('start', 'Botni ishga tushirish'),
-        BotCommand('help', 'Yordam'),
-        BotCommand('stat', 'Statistika (Admin)'),
-    ]
-    await app_obj.bot.set_my_commands(commands)
-    
-# --- 4. OMMAVIY XABAR YUBORISH (/send) ---
-async def send_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    if not context.args and not update.message.reply_to_message:
-        await update.message.reply_text("❌ Matn kiriting yoki xabarga reply qilib /send bosing.")
-        return
-
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM users")
-    users = cursor.fetchall()
-    conn.close()
-
-    success, failed = 0, 0
-    reply_msg = update.message.reply_to_message
-    message_to_send = " ".join(context.args) if context.args else None
-
-    for user in users:
-        try:
-            if reply_msg:
-                await reply_msg.copy(chat_id=user[0])
-            else:
-                await context.bot.send_message(chat_id=user[0], text=message_to_send)
-            success += 1
-            await asyncio.sleep(0.05)
-        except Exception:
-            failed += 1
-
-    await update.message.reply_text(f"✅ Yuborildi!\n\nMuvaffaqiyatli: {success}\nYuborilmadi: {failed}")
-
-
-# --- 5. ADMIN MONITORING FUNKSIYASI ---
-async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not user or user.id == ADMIN_ID:
-        return
-    if is_banned(user.id):
-        return
-
-    text_info = f"👤 {user.full_name} (@{user.username or 'yoq'})\n🆔 `{user.id}`\n\n💬 **Matn:**\n"
-    if update.message and update.message.text:
-        await context.bot.send_message(chat_id=ADMIN_ID, text=text_info + update.message.text, parse_mode="Markdown")
-
-
-# --- 6. XABARLARNI QABUL QILISH (HANDLE_MESSAGE) ---
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not user:
-        return
-
-    # Admin bo'lsa hech qanday cheklovsiz o'tadi
-    if user.id == ADMIN_ID:
-        return
-
-    # 1. Ban tekshiruvi
-    if is_banned(user.id):
-        return
-
-    # 2. Kanalga obuna tekshiruvi
-    is_subscribed = await check_user_subscription(user.id, context)
-    if not is_subscribed:
-        await send_subscription_warning(update)
-        return
-
-    # 3. Adminga monitoring orqali yetkazish (ID va Username)
-    await forward_to_admin(update, context)
-
-    # --- (Eski konspekt qilish kodingiz shu yerdan davom etadi) ---
-
-
-# --- 7. TUGMALAR BILAN ISHLASH (CALLBACK) ---
-async def enhanced_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user = query.from_user
-
-    if query.data == "check_sub":
-        is_subscribed = await check_user_subscription(user.id, context)
-        if is_subscribed:
-            await query.answer("Rahmat! Obunangiz tasdiqlandi 🎉", show_alert=True)
-            try:
-                await query.message.delete()
-            except Exception:
-                pass
-            await query.message.reply_text("✅ Obuna tasdiqlandi! Endi botdan to'liq foydalanishingiz mumkin. Matningizni yuboring:")
-        else:
-            await query.answer("❌ Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
-        return
-
-    # Agar boshqa oddiy menyu tugmalari bo'lsa, ularni eski button_click ga uzatamiz
-    if 'button_click' in globals() and button_click != enhanced_button_click:
-        await button_click(update, context)
-
-
-# --- 8. MAIN FUNKSIYASI ---
+# --- MAIN FUNKSIYASI ---
 def main():
     init_db()
     init_banned_db()
