@@ -474,12 +474,11 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_banned(user.id):
         return
 
-    text_info = f"👤 {user.full_name} (@{user.username or 'yoq'})\n🆔 `{user.id}`\n\n💬 **Matn:**\n"
+    text_info = f"👤 {user.full_name} (@{user.username or 'yoq'})\n🆔 {user.id}\n\n💬 Matn:\n"
     if update.message and update.message.text:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=text_info + update.message.text,
-            parse_mode="Markdown",
         )
 
 
