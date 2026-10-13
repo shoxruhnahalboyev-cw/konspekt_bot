@@ -347,6 +347,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
     user = update.message.from_user
+    print(f">>> START BOSILDI: User ID = {user.id}, Ismi = {user.full_name}") # <--- SHUNI QO'SHING
     add_user(user.id, user.full_name, user.username)
 
     if not await check_subscription(user.id, context):
@@ -485,6 +486,7 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    print(f">>> XABAR KELDI: User ID = {user.id if user else 'Noma’lum'}, Matn = {update.message.text if update.message else 'Matn yoq'}") # <--- SHUNI QO'SHING
     if not user:
         return
 
