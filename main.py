@@ -205,8 +205,10 @@ async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -
         )
         return member.status in ['creator', 'administrator', 'member']
     except Exception as e:
-        print(f'Obuna tekshirishda xatolik: {e}')
-        return False
+        print(f"Obuna tekshirishda xatolik (User {user_id}): {e}")
+        # Agar kanal topilmasa yoki qandaydir API xatosi bo'lsa,
+        # userlar jim qolmasligi uchun vaqtincha True qaytarib turamiz:
+        return True
 
 
 def sub_keyboard():
