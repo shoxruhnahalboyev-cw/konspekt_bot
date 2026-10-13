@@ -159,9 +159,7 @@ def wrap_text_by_pixels(text, font, max_width, draw):
     return lines
 
 
-async def check_subscription(
-    user_id: int, context: ContextTypes.DEFAULT_TYPE
-) -> bool:
+async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if ADMIN_ID and user_id == ADMIN_ID:
         return True
     try:
@@ -362,24 +360,37 @@ def unban_user_db(user_id):
 
 
 async def send_subscription_warning(update: Update):
-    keyboard = [
-        [InlineKeyboardButton("📢 Kanalga obuna bo'lish", url=f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}")],
-        [InlineKeyboardButton("🔄 Obunani tekshirish", callback_data="check_sub")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    clean_username = CHANNEL_USERNAME.replace('@', '')
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "📢 Kanalimizga a'zo bo'lish",
+                url=f'https://t.me/{clean_username}',
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "✅ A'zo bo'ldim / Tekshirish", callback_data='check_sub'
+            )
+        ],
+    ])
     text = (
-        "❌ **Botdan foydalanish uchun avval quyidagi kanalimizga obuna bo'lishingiz kerak!**\n\n"
-        f"Kanalga a'zo bo'lgach, **'🔄 Obunani tekshirish'** tugmasini bosing."
+        f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**\n\n"
+        "Kanalga a'zo bo'lgach, **'✅ A'zo bo'ldim / Tekshirish'** tugmasini bosing."
     )
+
     if update.callback_query:
         try:
             await update.callback_query.answer("Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
-            await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            await update.callback_query.message.edit_text(
+                text, reply_markup=keyboard, parse_mode='Markdown'
+            )
         except Exception:
             pass
     elif update.message:
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
+        await update.message.reply_text(
+            text, reply_markup=keyboard, parse_mode='Markdown'
+        )
 
 # --- ADMIN KOMANDALARI (/ban, /unban, /reply) ---
 async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
