@@ -487,7 +487,11 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text_info = f"👤 {user.full_name} (@{user.username or 'yoq'})\n🆔 `{user.id}`\n\n💬 **Matn:**\n"
     if update.message and update.message.text:
-        await context.bot.send_message(chat_id=ADMIN_ID, text=text_info + update.message.text, parse_mode="Markdown")
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=text_info + update.message.text,
+            parse_mode="Markdown",
+        )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -506,8 +510,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_subscription_warning(update)
             return
 
-        # 3. Adminga monitoring xabari
-        await forward_to_admin(update, context)
+    # 3. Adminga monitoring xabari
+    await forward_to_admin(update, context)
 
     if not update.message or not update.message.text:
         return
@@ -518,39 +522,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
     # Menyu tugmalari tekshiruvi
-    if text in ['✍️ Yangi matn yuborish', 'Yangi matn yuborish']:
+    if text in ["✍️ Yangi matn yuborish", "Yangi matn yuborish"]:
         user_data_store[user.id] = {}
         await update.message.reply_text(
-            '📥 **Konspekt qilish uchun yangi matningizni yuboring:**',
-            parse_mode='Markdown',
+            "📝 **Konspekt qilish uchun yangi matningizni yuboring:**",
+            parse_mode="Markdown",
             reply_markup=main_menu_keyboard(),
         )
         return
-    elif text == 'ℹ️ Bot haqida':
+    elif text == "ℹ️ Bot haqida":
         await update.message.reply_text(
-            "🤖 **Talaba Konspekt Bot** — Matnlaringizni xuddi talaba daftardagidek chiroyli qo'lyozma A4 konspektga aylantirib beradi.",
-            parse_mode='Markdown',
+            "🤖 **Talaba Konspekt Bot** — Matnlaringizni xuddi talaba daftardagidek chiroyli qo'lyozma A4 konspektiga aylantirib beradi.",
+            parse_mode="Markdown",
             reply_markup=main_menu_keyboard(),
         )
         return
-    elif text == '❓ Yordam':
+    elif text == "❓ Yordam":
         await update.message.reply_text(
-            '📌 Konspekt qilish uchun shunchaki matn yuboring va shriftni tanlang.',
+            "📌 Konspekt qilish uchun shunchaki matn yuboring va shriftni tanlang.",
             reply_markup=main_menu_keyboard(),
         )
         return
 
     # Matnni saqlaymiz va tugma chiqaramiz
-    user_data_store[user.id] = {'text': text}
+    user_data_store[user.id] = {"text": text}
 
     await update.message.reply_text(
-        '✅ Matn qabul qilindi!\n\nEndi yozuv uslubini tanlang:',
+        "✅ Matn qabul qilindi!\n\nEndi yozuv uslubini tanlang:",
         reply_markup=mode_inline_keyboard(),
     )
 
 
 # --- TUGMALAR BILAN ISHLASH (CALLBACK) ---
-async def enhanced_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def enhanced_button_click(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
     query = update.callback_query
     if not query:
         return
@@ -558,43 +564,50 @@ async def enhanced_button_click(update: Update, context: ContextTypes.DEFAULT_TY
     user = query.from_user
     data = query.data
 
-    if data == 'check_sub':
+    if data == "check_sub":
         is_subscribed = await check_subscription(user.id, context)
         if is_subscribed:
-            await query.answer("Rahmat! Obunangiz tasdiqlandi 🎉", show_alert=True)
+            await query.answer(
+                "Rahmat! Obunangiz tasdiqlandi 🎉", show_alert=True
+            )
             try:
                 await query.message.delete()
             except Exception:
                 pass
-            await query.message.reply_text("✅ Obuna tasdiqlandi! Endi botdan to'liq foydalanishingiz mumkin. Matningizni yuboring:")
+            await query.message.reply_text(
+                "✅ Obuna tasdiqlandi! Endi botdan to'liq foydalanishingiz mumkin. Matningizni yuboring:"
+            )
         else:
-            await query.answer("❌ Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
+            await query.answer(
+                "❌ Siz hali kanalga obuna bo'lmadingiz!", show_alert=True
+            )
         return
 
     await query.answer()
     user_id = query.from_user.id
 
     user_info = user_data_store.get(user_id, {})
-    if 'text' not in user_info or not user_info['text']:
+    if "text" not in user_info or not user_info["text"]:
         await query.message.reply_text(
-            '⚠️ Matn topilmadi! Iltimos, avval matn yuboring.',
+            "⚠️ Matn topilmadi! Iltimos, avval matn yuboring.",
             reply_markup=main_menu_keyboard(),
         )
         return
 
-    if data.startswith('mode_'):
-        user_data_store[user_id]['mode'] = (
-            'poem' if data == 'mode_poem' else 'text'
+    if data.startswith("mode_"):
+        user_data_store[user_id]["mode"] = (
+            "poem" if data == "mode_poem" else "text"
         )
+
         await query.edit_message_text(
             text="Ajoyib! Endi o'zingizga yoqqan shriftni tanlang:",
             reply_markup=fonts_inline_keyboard(),
         )
         return
 
-    if data == 'change_font':
+    if data == "change_font":
         await query.message.reply_text(
-            'Boshqa shriftni tanlang:', reply_markup=fonts_inline_keyboard()
+            "Boshqa shriftni tanlang:", reply_markup=fonts_inline_keyboard()
         )
         return
 
@@ -608,13 +621,12 @@ async def enhanced_button_click(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
     try:
-        raw_text = user_info['text']
+        raw_text = user_info["text"]
         clean_text = re.sub(
-            r'[^a-zA-Z0-9\s.,!?\"\'\-\—:;()№%@«»а-яА-ЯёЁo‘O‘g‘G‘o’O’g’G’]',
-            '',
-            raw_text,
+            r'[^a-zA-Z0-9\s.,!?\'"\-—:;()\[\]\u0400-\u04FF]', "", raw_text
         )
-        mode = user_info.get('mode', 'text')
+
+        mode = user_info.get("mode", "text")
 
         pages_bytes = await asyncio.to_thread(
             generate_pdf_pages, clean_text, mode, font_info
@@ -622,28 +634,32 @@ async def enhanced_button_click(update: Update, context: ContextTypes.DEFAULT_TY
 
         media_group = []
         for idx, bio in enumerate(pages_bytes):
-            bio.name = f'page_{idx+1}.jpg'
+            bio.name = f"page_{idx+1}.jpg"
             caption = (
-                f'📝 **A4 Konspekt -- {idx+1}/{len(pages_bytes)}-sahifa**'
+                f"📝 **A4 Konspekt — {idx+1}/{len(pages_bytes)}-sahifa**"
                 if idx == 0
-                else ''
+                else ""
             )
-            media_group.append(InputMediaPhoto(media=bio, caption=caption))
+            media_group.append(
+                InputMediaPhoto(media=bio, caption=caption)
+            )
 
-        re_select_keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton(
-                "🎨 Boshqa shriftda ko'rish", callback_data='change_font'
-            )
-        ]])
+        re_select_keyboard = InlineKeyboardMarkup(
+            [[
+                InlineKeyboardButton(
+                    "✏️ Boshqa shriftdi ko'rish", callback_data="change_font"
+                )
+            ]]
+        )
 
         await query.message.reply_media_group(media=media_group)
         await query.message.reply_text(
-            f'✅ Jami {len(pages_bytes)} ta A4 sahifa tayyorlandi!',
+            f"✅ Jami {len(pages_bytes)} ta A4 sahifa tayyorlandi!",
             reply_markup=re_select_keyboard,
         )
 
     except Exception as e:
-        await query.message.reply_text(f'❌ Xatolik yuz berdi: {e}')
+        await query.message.reply_text(f"❌ Xatolik yuz berdi: {e}")
 
 
 # --- MAIN FUNKSIYASI ---
@@ -656,23 +672,23 @@ def main():
     asyncio.set_event_loop(loop)
 
     application = Application.builder().token(TOKEN).build()
-    if 'setup_bot_commands' in globals():
+    if "setup_bot_commands" in globals():
         application.post_init = setup_bot_commands
 
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('help', start))
-    application.add_handler(CommandHandler('stat', stat_command))
-    application.add_handler(CommandHandler('send', send_broadcast))
-    
-    application.add_handler(CommandHandler('ban', ban_command))
-    application.add_handler(CommandHandler('unban', unban_command))
-    application.add_handler(CommandHandler('reply', reply_command))
-    
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", start))
+    application.add_handler(CommandHandler("stat", stat_command))
+    application.add_handler(CommandHandler("send", send_broadcast))
+
+    application.add_handler(CommandHandler("ban", ban_command))
+    application.add_handler(CommandHandler("unban", unban_command))
+    application.add_handler(CommandHandler("reply", reply_command))
+
     application.add_handler(MessageHandler(filters.ALL, handle_message))
     application.add_handler(CallbackQueryHandler(enhanced_button_click))
 
     application.run_polling(drop_pending_updates=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
