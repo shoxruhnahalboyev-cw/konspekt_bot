@@ -506,20 +506,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     add_user(user.id, user.full_name, user.username)
     text = update.message.text.strip()
 
-    if text in ["✍️ Yangi matn yuborish", "Yangi matn yuborish"]:
+    if "Yangi matn yuborish" in text:
         user_data_store[user.id] = {}
         await update.message.reply_text(
             "📝 Konspekt qilish uchun yangi matningizni yuboring:",
             reply_markup=main_menu_keyboard(),
         )
         return
-    elif text == "ℹ️ Bot haqida":
+    elif "Bot haqida" in text:
         await update.message.reply_text(
             "🤖 Talaba Konspekt Bot — Matnlaringizni xuddi talaba daftardagidek chiroyli qo'lyozma A4 konspektiga aylantirib beradi.",
             reply_markup=main_menu_keyboard(),
         )
         return
-    elif text == "❓ Yordam":
+    elif "Yordam" in text:
         await update.message.reply_text(
             "📌 Konspekt qilish uchun shunchaki matn yuboring va shriftni tanlang.",
             reply_markup=main_menu_keyboard(),
