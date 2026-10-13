@@ -93,6 +93,43 @@ def get_users_count() -> int:
         return 0
 
 
+# --- BAN BAZASI VA FUNKSIYALARI ---
+def init_banned_db():
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS banned_users (user_id INTEGER PRIMARY KEY)')
+    conn.commit()
+    conn.close()
+
+
+def is_banned(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id FROM banned_users WHERE user_id = ?', (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+
+def ban_user_db(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO banned_users (user_id) VALUES (?)', (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def unban_user_db(user_id):
+    init_banned_db()
+    conn = sqlite3.connect('bot_users.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM banned_users WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+
 FONTS = {
     'font1': {
         'name': "✍️ 1. Caveat (Talaba qo'lyozmasi)",
@@ -187,6 +224,23 @@ def sub_keyboard():
             )
         ],
     ])
+
+
+async def send_subscription_warning(update: Update):
+    clean_username = CHANNEL_USERNAME.replace('@', '')
+    keyboard = sub_keyboard()
+    text = (
+        f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**\n\n"
+        "Kanalga a'zo bo'lgach, **'✅ A'zo bo'ldim / Tekshirish'** tugmasini bosing."
+    )
+    if update.callback_query:
+        try:
+            await update.callback_query.answer("Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
+            await update.callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+        except Exception:
+            pass
+    elif update.message:
+        await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
 
 def main_menu_keyboard():
@@ -325,73 +379,6 @@ async def stat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# --- BAN BAZASI VA FUNKSIYALARI ---
-def init_banned_db():
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS banned_users (user_id INTEGER PRIMARY KEY)')
-    conn.commit()
-    conn.close()
-
-def is_banned(user_id):
-    init_banned_db()
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT user_id FROM banned_users WHERE user_id = ?', (user_id,))
-    result = cursor.fetchone()
-    conn.close()
-    return result is not None
-
-def ban_user_db(user_id):
-    init_banned_db()
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('INSERT OR IGNORE INTO banned_users (user_id) VALUES (?)', (user_id,))
-    conn.commit()
-    conn.close()
-
-def unban_user_db(user_id):
-    init_banned_db()
-    conn = sqlite3.connect('bot_users.db')
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM banned_users WHERE user_id = ?', (user_id,))
-    conn.commit()
-    conn.close()
-
-
-async def send_subscription_warning(update: Update):
-    clean_username = CHANNEL_USERNAME.replace('@', '')
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "📢 Kanalimizga a'zo bo'lish",
-                url=f'https://t.me/{clean_username}',
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "✅ A'zo bo'ldim / Tekshirish", callback_data='check_sub'
-            )
-        ],
-    ])
-    text = (
-        f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**\n\n"
-        "Kanalga a'zo bo'lgach, **'✅ A'zo bo'ldim / Tekshirish'** tugmasini bosing."
-    )
-
-    if update.callback_query:
-        try:
-            await update.callback_query.answer("Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
-            await update.callback_query.message.edit_text(
-                text, reply_markup=keyboard, parse_mode='Markdown'
-            )
-        except Exception:
-            pass
-    elif update.message:
-        await update.message.reply_text(
-            text, reply_markup=keyboard, parse_mode='Markdown'
-        )
-
 # --- ADMIN KOMANDALARI (/ban, /unban, /reply) ---
 async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -499,29 +486,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         return
 
-    # 1. Ban tekshiruvi (Admin kirmaydi)
     if user.id != ADMIN_ID and is_banned(user.id):
         return
 
-    # 2. Kanalga obuna tekshiruvi (Admin kirmaydi)
     if user.id != ADMIN_ID:
         is_subscribed = await check_subscription(user.id, context)
         if not is_subscribed:
             await send_subscription_warning(update)
             return
 
-    # 3. Adminga monitoring xabari
     await forward_to_admin(update, context)
 
     if not update.message or not update.message.text:
         return
 
-    # Foydalanuvchini bazaga qo'shish
     add_user(user.id, user.full_name, user.username)
-
     text = update.message.text.strip()
 
-    # Menyu tugmalari tekshiruvi
     if text in ["✍️ Yangi matn yuborish", "Yangi matn yuborish"]:
         user_data_store[user.id] = {}
         await update.message.reply_text(
@@ -544,9 +525,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Matnni saqlaymiz va tugma chiqaramiz
     user_data_store[user.id] = {"text": text}
-
     await update.message.reply_text(
         "✅ Matn qabul qilindi!\n\nEndi yozuv uslubini tanlang:",
         reply_markup=mode_inline_keyboard(),
@@ -575,7 +554,8 @@ async def enhanced_button_click(
             except Exception:
                 pass
             await query.message.reply_text(
-                "✅ Obuna tasdiqlandi! Endi botdan to'liq foydalanishingiz mumkin. Matningizni yuboring:"
+                "✅ Obuna tasdiqlandi! Endi botdan to'liq foydalanishingiz mumkin. Matningizని yuboring:",
+                reply_markup=main_menu_keyboard()
             )
         else:
             await query.answer(
