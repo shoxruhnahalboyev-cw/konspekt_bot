@@ -485,7 +485,7 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    print(f">>> XABAR KELDI: User ID = {user.id if user else 'Noma’lum'}, Matn = {update.message.text if update.message else 'Matn yoq'}") # <--- SHUNI QO'SHING
+    print(f">>> XABAR KELDI: User ID = {user.id if user else 'Noma’lum'}, Matn = {update.message.text if update.message else 'Matn yoq'}")
     if not user:
         return
 
@@ -509,15 +509,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text in ["✍️ Yangi matn yuborish", "Yangi matn yuborish"]:
         user_data_store[user.id] = {}
         await update.message.reply_text(
-            "📝 **Konspekt qilish uchun yangi matningizni yuboring:**",
-            parse_mode="Markdown",
+            "📝 Konspekt qilish uchun yangi matningizni yuboring:",
             reply_markup=main_menu_keyboard(),
         )
         return
     elif text == "ℹ️ Bot haqida":
         await update.message.reply_text(
-            "🤖 **Talaba Konspekt Bot** — Matnlaringizni xuddi talaba daftardagidek chiroyli qo'lyozma A4 konspektiga aylantirib beradi.",
-            parse_mode="Markdown",
+            "🤖 Talaba Konspekt Bot — Matnlaringizni xuddi talaba daftardagidek chiroyli qo'lyozma A4 konspektiga aylantirib beradi.",
             reply_markup=main_menu_keyboard(),
         )
         return
