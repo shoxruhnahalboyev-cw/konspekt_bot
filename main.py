@@ -352,8 +352,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not await check_subscription(user.id, context):
         await update.message.reply_text(
-            f"⚠️ **Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!**",
-            parse_mode='Markdown',
+            f"⚠️ Botdan foydalanish uchun {CHANNEL_USERNAME} kanalimizga a'zo bo'ling!\n\nKanalga a'zo bo'lgach, qaytadan /start bosing.",
             reply_markup=sub_keyboard(),
         )
         return
