@@ -479,32 +479,34 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_ID, text=text_info + update.message.text, parse_mode="Markdown")
 
 
-# --- XABARLARNI QABUL QILISH (HANDLE_MESSAGE) ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not user:
         return
 
-    # Agar foydalanuvchi admin bo'lmasa, ban va obunani tekshiramiz
-    if user.id != ADMIN_ID:
-        if is_banned(user.id):
-            return
+    # 1. Ban tekshiruvi (Admin kirmaydi)
+    if user.id != ADMIN_ID and is_banned(user.id):
+        return
 
+    # 2. Kanalga obuna tekshiruvi (Admin kirmaydi)
+    if user.id != ADMIN_ID:
         is_subscribed = await check_subscription(user.id, context)
         if not is_subscribed:
             await send_subscription_warning(update)
             return
 
-        # Oddiy foydalanuvchilar xabarini adminga yo'naltiramiz
+        # 3. Adminga monitoring xabari
         await forward_to_admin(update, context)
 
     if not update.message or not update.message.text:
         return
 
+    # Foydalanuvchini bazaga qo'shish
     add_user(user.id, user.full_name, user.username)
 
     text = update.message.text.strip()
 
+    # Menyu tugmalari tekshiruvi
     if text in ['✍️ Yangi matn yuborish', 'Yangi matn yuborish']:
         user_data_store[user.id] = {}
         await update.message.reply_text(
@@ -527,6 +529,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # Matnni saqlaymiz va tugma chiqaramiz
     user_data_store[user.id] = {'text': text}
 
     await update.message.reply_text(
